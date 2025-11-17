@@ -1,0 +1,26 @@
+{
+  "name": "builderhub-onbase",
+  "version": "1.0.0",
+  "description": "Builder Hub on Base - Analytics platform for Base developers",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve . -p ${PORT:-3000}",
+    "dev": "npx serve . -p 3000",
+    "serve": "npx serve . -p ${PORT:-3000}"
+  },
+  "keywords": [
+    "base",
+    "blockchain",
+    "analytics",
+    "developer",
+    "leaderboard"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
