@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Builder Hub on Base - Official Developer Directory and Analytics Platform">
+    <title>Builder Hub on Base | Developer Analytics & Leaderboard</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>Builder Hub on Base</h1>
+            </div>
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="#leaderboard" class="nav-link">Leaderboard</a></li>
+                <li><a href="#workflow" class="nav-link">How It Works</a></li>
+            </ul>
+            <div class="wallet-section">
+                <button id="connectWalletBtn" class="btn btn-primary">Connect MetaMask Wallet</button>
+                <div id="walletInfo" class="wallet-info" style="display: none;">
+                    <span id="walletAddress"></span>
+                    <button id="disconnectWalletBtn" class="btn btn-secondary btn-sm">Disconnect</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-background"></div>
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="hero-title">Developer Hub on Base</h1>
+                <p class="hero-subtitle">Connecting Base Builders - Track Your Project Analytics & Compete on the Leaderboard</p>
+                <div class="hero-buttons">
+                    <button id="connectWalletHeroBtn" class="btn btn-primary btn-large">Connect MetaMask Wallet</button>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <div class="stat-number" id="totalProjects">0</div>
+                        <div class="stat-label">Projects Listed</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="totalDevelopers">0</div>
+                        <div class="stat-label">Active Developers</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number" id="totalTransactions">0</div>
+                        <div class="stat-label">Total Transactions</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Workflow Section -->
+    <section id="workflow" class="workflow">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">How It Works</h2>
+                <p class="section-subtitle">Deploy your project, connect with our website, and check analytics</p>
+            </div>
+            <div class="workflow-steps">
+                <div class="workflow-step">
+                    <div class="step-number">01</div>
+                    <div class="step-content">
+                        <h3>Deploy Your Project</h3>
+                        <p>Deploy your smart contract on Base chain</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">02</div>
+                    <div class="step-content">
+                        <h3>Connect with Website</h3>
+                        <p>Connect your MetaMask wallet and register your project</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">03</div>
+                    <div class="step-content">
+                        <h3>Verify Ownership</h3>
+                        <p>Verify contract ownership through signature verification</p>
+                    </div>
+                </div>
+                <div class="workflow-step">
+                    <div class="step-number">04</div>
+                    <div class="step-content">
+                        <h3>Check Analytics</h3>
+                        <p>Track your project stats, rankings, and compete on the leaderboard</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Leaderboard Section -->
+    <section id="leaderboard" class="leaderboard">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Top 100 Developers</h2>
+                <p class="section-subtitle">Ranked by on-chain activity and unique wallet interactions</p>
+            </div>
+            <div class="leaderboard-tabs">
+                <button class="tab-btn active" data-tab="transactions">Rank by Transactions</button>
+                <button class="tab-btn" data-tab="wallets">Rank by Unique Wallets</button>
+            </div>
+            <div class="leaderboard-table-container">
+                <table class="leaderboard-table" id="leaderboardTable">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Project Name</th>
+                            <th>Contract Address</th>
+                            <th>Transactions</th>
+                            <th>Unique Wallets</th>
+                            <th>X Account</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboardBody">
+                        <tr>
+                            <td colspan="6" class="loading">Loading leaderboard...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Analytics Dashboard Preview -->
+    <section id="analytics-preview" class="analytics-preview">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Get Started with Analytics</h2>
+                <p class="section-subtitle">Track your project performance in real-time</p>
+            </div>
+            <div class="analytics-dashboard">
+                <div class="dashboard-card">
+                    <div class="dashboard-header">
+                        <h3>Project Stats</h3>
+                    </div>
+                    <div class="dashboard-content">
+                        <div class="stat-card">
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-details">
+                                <div class="stat-value">0</div>
+                                <div class="stat-label">Total Transactions</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">👥</div>
+                            <div class="stat-details">
+                                <div class="stat-value">0</div>
+                                <div class="stat-label">Unique Wallets</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📈</div>
+                            <div class="stat-details">
+                                <div class="stat-value">0%</div>
+                                <div class="stat-label">Growth Rate</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🏆</div>
+                            <div class="stat-details">
+                                <div class="stat-value">#--</div>
+                                <div class="stat-label">Your Rank</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="dashboard-cta">
+                    <p>Connect your wallet to see your full analytics dashboard</p>
+                    <button id="connectWalletCtaBtn" class="btn btn-primary">Connect Wallet</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>Builder Hub on Base</h3>
+                    <p>The official developer directory of Base chain.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="https://base.org" target="_blank">Base Chain</a></li>
+                        <li><a href="https://basescan.org" target="_blank">BaseScan</a></li>
+                        <li><a href="#" target="_blank">Documentation</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Builder Hub on Base. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

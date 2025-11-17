@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer Dashboard | Builder Hub on Base</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="index.html"><h1>Builder Hub on Base</h1></a>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html#leaderboard" class="nav-link">Leaderboard</a></li>
+            </ul>
+            <div class="wallet-section">
+                <div id="walletInfo" class="wallet-info">
+                    <span id="walletAddress"></span>
+                    <button id="disconnectWalletBtn" class="btn btn-secondary btn-sm">Disconnect</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <section class="profile-dashboard">
+        <div class="container">
+            <!-- Developer Info Section -->
+            <div class="developer-header">
+                <div class="developer-info">
+                    <h2 id="developerName">Developer Profile</h2>
+                    <div class="developer-socials">
+                        <a id="xLink" href="#" target="_blank" class="social-link">X</a>
+                        <a id="githubLink" href="#" target="_blank" class="social-link">GitHub</a>
+                    </div>
+                </div>
+                <div class="contract-info">
+                    <p class="contract-label">Main Contract</p>
+                    <p class="contract-address" id="mainContractAddress">0x...</p>
+                </div>
+            </div>
+
+            <!-- Project Stats Section (Top 30%) -->
+            <div class="stats-section">
+                <h3 class="section-title">Project Statistics</h3>
+                <div class="stats-grid">
+                    <div class="stat-card-large">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-content">
+                            <div class="stat-label">Total Transactions</div>
+                            <div class="stat-value-large" id="totalTx">0</div>
+                            <div class="stat-change">
+                                <span id="txLast12h">0</span> in last 12 hours
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card-large">
+                        <div class="stat-icon">👥</div>
+                        <div class="stat-content">
+                            <div class="stat-label">Unique Wallets</div>
+                            <div class="stat-value-large" id="uniqueWallets">0</div>
+                            <div class="stat-change">
+                                <span id="walletsLast12h">0</span> in last 12 hours
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card-large">
+                        <div class="stat-icon">📈</div>
+                        <div class="stat-content">
+                            <div class="stat-label">Growth Rate</div>
+                            <div class="stat-value-large" id="growthRate">0%</div>
+                            <div class="stat-change">Last 24 hours</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rankings Section -->
+            <div class="rankings-section">
+                <h3 class="section-title">Your Rankings</h3>
+                <div class="rankings-grid">
+                    <div class="rank-card">
+                        <div class="rank-header">
+                            <h4>Transaction Rank</h4>
+                            <div class="rank-badge" id="txRank">#--</div>
+                        </div>
+                        <p class="rank-description">Your position based on total transactions</p>
+                    </div>
+                    <div class="rank-card">
+                        <div class="rank-header">
+                            <h4>Unique Wallet Rank</h4>
+                            <div class="rank-badge" id="walletRank">#--</div>
+                        </div>
+                        <p class="rank-description">Your position based on unique wallet interactions</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Contract Addresses -->
+            <div class="contracts-section" id="additionalContractsSection" style="display: none;">
+                <h3 class="section-title">Additional Contracts</h3>
+                <div class="contracts-list" id="additionalContractsList"></div>
+            </div>
+        </div>
+    </section>
+
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <script src="js/profile.js"></script>
+</body>
+</html>
+

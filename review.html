@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Review Panel | Builder Hub on Base</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="index.html"><h1>Builder Hub on Base</h1></a>
+            </div>
+            <div class="wallet-section">
+                <button id="connectWalletBtn" class="btn btn-primary">Connect Admin Wallet</button>
+                <div id="walletInfo" class="wallet-info" style="display: none;">
+                    <span id="walletAddress"></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <section class="review-panel">
+        <div class="container">
+            <!-- Access Denied Message -->
+            <div id="accessDenied" class="access-denied">
+                <h2>Access Denied</h2>
+                <p>This page is only accessible to admin wallets.</p>
+                <p>Please connect the admin wallet to continue.</p>
+            </div>
+
+            <!-- Admin Panel -->
+            <div id="adminPanel" style="display: none;">
+                <div class="panel-header">
+                    <h2>Admin Review Panel</h2>
+                    <p>Review and approve developer submissions</p>
+                </div>
+
+                <div class="review-filters">
+                    <button class="filter-btn active" data-filter="pending">Pending</button>
+                    <button class="filter-btn" data-filter="approved">Approved</button>
+                    <button class="filter-btn" data-filter="rejected">Rejected</button>
+                </div>
+
+                <div class="submissions-list" id="submissionsList">
+                    <div class="loading">Loading submissions...</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Submission Detail Modal -->
+    <div id="submissionModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h3>Submission Details</h3>
+            <div id="submissionDetails"></div>
+            <div class="modal-actions">
+                <button id="approveBtn" class="btn btn-primary">Approve</button>
+                <button id="rejectBtn" class="btn btn-danger">Reject</button>
+                <button id="closeModalBtn" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <script>
+        const ADMIN_WALLET = '0xb0dfc6ca6aafd3b0719949aa029d30d79fed30a4';
+    </script>
+    <script src="js/review.js"></script>
+</body>
+</html>
+

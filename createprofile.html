@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Profile | Builder Hub on Base</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <a href="index.html"><h1>Builder Hub on Base</h1></a>
+            </div>
+            <div class="wallet-section">
+                <div id="walletInfo" class="wallet-info">
+                    <span id="walletAddress"></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <section class="create-profile-section">
+        <div class="container">
+            <div class="profile-form-container">
+                <div class="form-header">
+                    <h2>Create Developer Profile</h2>
+                    <p>Register your project on Base chain</p>
+                </div>
+
+                <form id="profileForm" class="profile-form">
+                    <!-- X Account (Required) -->
+                    <div class="form-group">
+                        <label for="xUsername">X Account (Twitter) <span class="required">*</span></label>
+                        <input type="text" id="xUsername" name="xUsername" placeholder="@username" required>
+                        <small>Your X/Twitter username (required for verification)</small>
+                    </div>
+
+                    <!-- Project X Account (Optional) -->
+                    <div class="form-group">
+                        <label for="projectX">Project X Account (Optional)</label>
+                        <input type="text" id="projectX" name="projectX" placeholder="@projectname">
+                        <small>Your project's official X account</small>
+                    </div>
+
+                    <!-- GitHub Link (Optional) -->
+                    <div class="form-group">
+                        <label for="githubLink">GitHub Link (Optional)</label>
+                        <input type="url" id="githubLink" name="githubLink" placeholder="https://github.com/username">
+                        <small>Your GitHub profile or repository link</small>
+                    </div>
+
+                    <!-- Main Contract Address (Required) -->
+                    <div class="form-group">
+                        <label for="mainContract">Main Contract Address <span class="required">*</span></label>
+                        <input type="text" id="mainContract" name="mainContract" placeholder="0x..." required pattern="^0x[a-fA-F0-9]{40}$">
+                        <small>Your main smart contract address on Base</small>
+                        <button type="button" id="verifyMainContractBtn" class="btn btn-secondary btn-sm">Verify Ownership</button>
+                        <div id="mainContractStatus" class="contract-status"></div>
+                    </div>
+
+                    <!-- Optional Contract Address 1 -->
+                    <div class="form-group">
+                        <label for="optionalContract1">Optional Contract Address 1</label>
+                        <input type="text" id="optionalContract1" name="optionalContract1" placeholder="0x..." pattern="^0x[a-fA-F0-9]{40}$">
+                        <small>Additional contract address (optional)</small>
+                    </div>
+
+                    <!-- Optional Contract Address 2 -->
+                    <div class="form-group">
+                        <label for="optionalContract2">Optional Contract Address 2</label>
+                        <input type="text" id="optionalContract2" name="optionalContract2" placeholder="0x..." pattern="^0x[a-fA-F0-9]{40}$">
+                        <small>Additional contract address (optional)</small>
+                    </div>
+
+                    <!-- Signature Verification -->
+                    <div id="signatureSection" class="signature-section" style="display: none;">
+                        <div class="form-group">
+                            <label>Contract Ownership Verification</label>
+                            <p class="verification-message">Please sign a message to verify contract ownership</p>
+                            <button type="button" id="signMessageBtn" class="btn btn-primary">Sign Verification Message</button>
+                            <div id="signatureStatus" class="contract-status"></div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="form-actions">
+                        <button type="submit" id="submitProfileBtn" class="btn btn-primary btn-large" disabled>Submit Profile</button>
+                        <p class="form-note">Your profile will be reviewed by admin before approval</p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <script src="js/createprofile.js"></script>
+</body>
+</html>
+
