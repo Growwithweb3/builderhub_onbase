@@ -606,28 +606,41 @@ app.post('/api/verify-contract-owner', async (req, res) => {
         // Get contract deployer
         const deployer = await getContractDeployer(contractAddress);
 
-        // If deployer can't be found, allow signature verification instead
+        // If deployer can't be found, reject - we cannot verify ownership
         if (!deployer) {
-            console.log('⚠️  Deployer not found, allowing signature-based verification');
+            console.log('⚠️  Deployer not found - cannot verify ownership');
             return res.json({
-                success: true,
+                success: false,
                 deployerMatches: false,
                 deployerAddress: null,
-                requiresSignature: true,
-                message: 'Could not automatically verify deployer. Please sign a message to prove ownership.'
+                message: 'Unable to verify contract ownership. The contract deployer could not be found. Please ensure the contract exists on Base network.'
             });
         }
 
-        const deployerMatches = deployer === walletAddress.toLowerCase();
-        const requiresSignature = !deployerMatches;
+        const deployerMatches = deployer.toLowerCase() === walletAddress.toLowerCase();
 
-        console.log('Deployer check:', { deployer, walletAddress: walletAddress.toLowerCase(), deployerMatches });
+        console.log('🔍 Deployer check:', { 
+            deployer: deployer.toLowerCase(), 
+            walletAddress: walletAddress.toLowerCase(), 
+            deployerMatches 
+        });
 
+        if (!deployerMatches) {
+            // Deployer doesn't match - REJECT
+            return res.json({
+                success: false,
+                deployerMatches: false,
+                deployerAddress: deployer,
+                message: `Contract ownership verification failed. Please use the wallet that deployed this contract (${deployer.slice(0, 6)}...${deployer.slice(-4)}).`
+            });
+        }
+
+        // Deployer matches - ALLOW
         res.json({
             success: true,
-            deployerMatches,
+            deployerMatches: true,
             deployerAddress: deployer,
-            requiresSignature: false // No longer accepting signatures from other wallets
+            message: 'Contract ownership verified successfully.'
         });
     } catch (error) {
         console.error('Verify contract owner error:', error);
