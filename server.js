@@ -30,7 +30,9 @@ if (DATABASE_URL) {
     try {
         pool = new Pool({
             connectionString: DATABASE_URL,
-            ssl: DATABASE_URL?.includes('railway') || DATABASE_URL?.includes('railway.internal') 
+            // Railway requires SSL for all connections (internal and public)
+            // Check for railway in URL or rlwy.net domain
+            ssl: DATABASE_URL?.includes('railway') || DATABASE_URL?.includes('rlwy.net')
                 ? { rejectUnauthorized: false } 
                 : false,
             // Connection pool settings
