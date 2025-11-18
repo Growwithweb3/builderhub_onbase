@@ -162,8 +162,9 @@ app.use((req, res, next) => {
  */
 async function getContractDeployer(contractAddress) {
     try {
-        // Use Etherscan API V2 (works for Base chain)
-        const response = await axios.get('https://api.basescan.org/api', {
+        // Try Basescan API (Etherscan-compatible for Base)
+        // First try with contractaddresses (plural)
+        let response = await axios.get('https://api.basescan.org/api', {
             params: {
                 module: 'contract',
                 action: 'getcontractcreation',
@@ -172,22 +173,80 @@ async function getContractDeployer(contractAddress) {
             }
         });
 
-        console.log('Basescan API Response:', {
+        console.log('Basescan API Response (contractaddresses):', {
             status: response.data.status,
             message: response.data.message,
-            resultCount: response.data.result?.length
+            result: response.data.result
         });
 
-        if (response.data.status === '1' && response.data.result?.length > 0) {
-            const deployer = response.data.result[0].contractCreator.toLowerCase();
-            console.log(`Contract ${contractAddress} deployer: ${deployer}`);
-            return deployer;
-        } else {
-            console.warn('Contract deployer not found:', response.data.message || 'Unknown error');
-            return null;
+        // If that doesn't work, try with contractaddress (singular)
+        if (response.data.status !== '1' || !response.data.result || response.data.result.length === 0) {
+            console.log('Trying with contractaddress (singular)...');
+            response = await axios.get('https://api.basescan.org/api', {
+                params: {
+                    module: 'contract',
+                    action: 'getcontractcreation',
+                    contractaddress: contractAddress,
+                    apikey: BASESCAN_API_KEY
+                }
+            });
+            
+            console.log('Basescan API Response (contractaddress):', {
+                status: response.data.status,
+                message: response.data.message,
+                result: response.data.result
+            });
         }
+
+        // Check response format
+        if (response.data.status === '1') {
+            // Handle array result
+            if (Array.isArray(response.data.result) && response.data.result.length > 0) {
+                const deployer = response.data.result[0].contractCreator?.toLowerCase();
+                if (deployer) {
+                    console.log(`✅ Contract ${contractAddress} deployer: ${deployer}`);
+                    return deployer;
+                }
+            }
+            // Handle single object result
+            if (response.data.result && response.data.result.contractCreator) {
+                const deployer = response.data.result.contractCreator.toLowerCase();
+                console.log(`✅ Contract ${contractAddress} deployer: ${deployer}`);
+                return deployer;
+            }
+        }
+
+        // If API failed, try alternative: get first transaction to find creator
+        console.log('Trying alternative method: getting contract transactions...');
+        const txResponse = await axios.get('https://api.basescan.org/api', {
+            params: {
+                module: 'account',
+                action: 'txlist',
+                address: contractAddress,
+                startblock: 0,
+                endblock: 99999999,
+                page: 1,
+                offset: 1,
+                sort: 'asc',
+                apikey: BASESCAN_API_KEY
+            }
+        });
+
+        if (txResponse.data.status === '1' && txResponse.data.result?.length > 0) {
+            // The first transaction's 'from' address is usually the deployer
+            const deployer = txResponse.data.result[0].from.toLowerCase();
+            console.log(`✅ Contract ${contractAddress} deployer (from tx): ${deployer}`);
+            return deployer;
+        }
+
+        console.warn('❌ Contract deployer not found. API Response:', JSON.stringify(response.data, null, 2));
+        return null;
     } catch (error) {
-        console.error('Error fetching contract deployer:', error.response?.data || error.message);
+        console.error('❌ Error fetching contract deployer:', {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status
+        });
         return null;
     }
 }
