@@ -1,32 +1,73 @@
 // ============================================
 // Admin Wallet Check
 // ============================================
-const ADMIN_WALLET = '0xb0dfc6ca6aafd3b0719949aa029d30d79fed30a4';
+// Version: 2.1 - Fixed redeclaration and wallet connection
+// Prevent redeclaration error - use window property instead of const
+if (typeof window.ADMIN_WALLET_ADDRESS === 'undefined') {
+    window.ADMIN_WALLET_ADDRESS = '0xb0dfc6ca6aafd3b0719949aa029d30d79fed30a4';
+}
 let userAddress = null;
 let currentFilter = 'pending';
 
 // Initialize wallet connection
 async function connectAdminWallet() {
+    console.log('🔌 Connect wallet button clicked');
+    
     if (typeof window.ethereum === 'undefined') {
         alert('Please install MetaMask to use this application!');
         return;
     }
 
+    const connectBtn = document.getElementById('connectWalletBtn');
+    if (connectBtn) {
+        connectBtn.disabled = true;
+        connectBtn.textContent = 'Connecting...';
+    }
+
     try {
+        console.log('📡 Requesting accounts from MetaMask...');
         const accounts = await window.ethereum.request({
             method: 'eth_requestAccounts'
         });
 
-        userAddress = accounts[0].toLowerCase();
+        if (!accounts || accounts.length === 0) {
+            alert('No accounts found. Please unlock MetaMask.');
+            if (connectBtn) {
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect Admin Wallet';
+            }
+            return;
+        }
 
-        if (userAddress === ADMIN_WALLET.toLowerCase()) {
+        userAddress = accounts[0].toLowerCase();
+        const adminWalletLower = (window.ADMIN_WALLET_ADDRESS || '').toLowerCase();
+        
+        console.log('✅ Connected wallet:', userAddress);
+        console.log('🔑 Admin wallet:', adminWalletLower);
+        console.log('🔍 Wallet match:', userAddress === adminWalletLower);
+
+        if (userAddress === adminWalletLower) {
+            console.log('✅ Admin wallet confirmed - showing panel');
             showAdminPanel();
         } else {
+            console.log('❌ Non-admin wallet - showing access denied');
             showAccessDenied();
+            if (connectBtn) {
+                connectBtn.disabled = false;
+                connectBtn.textContent = 'Connect Admin Wallet';
+            }
         }
     } catch (error) {
-        console.error('Error connecting wallet:', error);
-        alert('Failed to connect wallet');
+        console.error('❌ Error connecting wallet:', error);
+        if (connectBtn) {
+            connectBtn.disabled = false;
+            connectBtn.textContent = 'Connect Admin Wallet';
+        }
+        if (error.code === 4001) {
+            alert('Please approve the connection request in MetaMask');
+        } else {
+            alert('Failed to connect wallet: ' + error.message);
+        }
     }
 }
 
@@ -60,7 +101,7 @@ if (typeof window.ethereum !== 'undefined') {
             showAccessDenied();
         } else {
             userAddress = accounts[0].toLowerCase();
-            if (userAddress === ADMIN_WALLET.toLowerCase()) {
+            if (userAddress === window.ADMIN_WALLET_ADDRESS.toLowerCase()) {
                 showAdminPanel();
             } else {
                 showAccessDenied();
@@ -71,9 +112,14 @@ if (typeof window.ethereum !== 'undefined') {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('Review page loaded, initializing...');
+    
     const connectBtn = document.getElementById('connectWalletBtn');
     if (connectBtn) {
+        console.log('Connect button found, adding event listener');
         connectBtn.addEventListener('click', connectAdminWallet);
+    } else {
+        console.error('Connect button not found!');
     }
 
     // Filter buttons
@@ -115,7 +161,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // API Configuration
 // ============================================
 const API_BASE_URL = window.API_BASE_URL || 'https://builderhubonbase-production.up.railway.app/api';
-const ADMIN_WALLET = '0xb0dfc6ca6aafd3b0719949aa029d30d79fed30a4';
 
 // ============================================
 // Load Submissions
@@ -126,21 +171,45 @@ async function loadSubmissions() {
     if (!submissionsList) return;
 
     try {
+        console.log('🔍 Loading submissions with filter:', currentFilter);
+        console.log('🔑 Admin wallet:', window.ADMIN_WALLET_ADDRESS);
+        console.log('🔑 Admin wallet (lowercase):', (window.ADMIN_WALLET_ADDRESS || '').toLowerCase());
+        
+        // Ensure admin wallet is lowercase for backend comparison
+        const adminWallet = (window.ADMIN_WALLET_ADDRESS || '').toLowerCase();
+        
         const response = await fetch(`${API_BASE_URL}/pending-submissions?status=${currentFilter}`, {
             headers: {
-                'x-admin-wallet': ADMIN_WALLET
+                'x-admin-wallet': adminWallet
             }
         });
+
+        console.log('📡 Response status:', response.status, response.statusText);
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+            console.error('❌ API Error:', errorData);
+            submissionsList.innerHTML = `<div class="loading">Error: ${errorData.message || 'Failed to load submissions'}</div>`;
+            return;
+        }
+
         const data = await response.json();
+        console.log('📦 Response data:', data);
+        console.log('📊 Submissions count:', data.submissions?.length || 0);
 
         if (data.success && data.submissions) {
-            displaySubmissions(data.submissions);
+            if (data.submissions.length === 0) {
+                submissionsList.innerHTML = '<div class="loading">No submissions found</div>';
+            } else {
+                displaySubmissions(data.submissions);
+            }
         } else {
+            console.warn('⚠️ Unexpected response format:', data);
             submissionsList.innerHTML = '<div class="loading">No submissions found</div>';
         }
     } catch (error) {
-        console.error('Error loading submissions:', error);
-        submissionsList.innerHTML = '<div class="loading">Error loading submissions</div>';
+        console.error('❌ Error loading submissions:', error);
+        submissionsList.innerHTML = `<div class="loading">Error loading submissions: ${error.message}</div>`;
     }
 }
 
@@ -152,10 +221,26 @@ function displaySubmissions(submissions) {
         return;
     }
 
-    submissionsList.innerHTML = submissions.map(submission => `
-        <div class="submission-card" onclick="showSubmissionDetails('${submission._id || submission.id}')">
+    console.log('🎨 Displaying', submissions.length, 'submissions');
+
+    submissionsList.innerHTML = submissions.map(submission => {
+        // Format date safely
+        let dateStr = 'N/A';
+        try {
+            if (submission.dateSubmitted) {
+                const date = new Date(submission.dateSubmitted);
+                if (!isNaN(date.getTime())) {
+                    dateStr = date.toLocaleDateString();
+                }
+            }
+        } catch (e) {
+            console.error('Date formatting error:', e);
+        }
+
+        return `
+        <div class="submission-card" onclick="showSubmissionDetails('${submission.id}')">
             <div class="submission-header">
-                <div class="submission-wallet">${submission.walletAddress}</div>
+                <div class="submission-wallet">${submission.walletAddress || 'N/A'}</div>
                 <div class="submission-status ${submission.isApproved ? 'approved' : submission.isRejected ? 'rejected' : 'pending'}">
                     ${submission.isApproved ? 'Approved' : submission.isRejected ? 'Rejected' : 'Pending'}
                 </div>
@@ -171,11 +256,12 @@ function displaySubmissions(submissions) {
                 </div>
                 <div class="submission-detail-item">
                     <strong>Submitted:</strong>
-                    ${new Date(submission.dateSubmitted).toLocaleDateString()}
+                    ${dateStr}
                 </div>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // ============================================
@@ -186,9 +272,12 @@ async function showSubmissionDetails(submissionId) {
     const detailsDiv = document.getElementById('submissionDetails');
 
     try {
+        // Ensure admin wallet is lowercase for backend comparison
+        const adminWallet = (window.ADMIN_WALLET_ADDRESS || '').toLowerCase();
+        
         const response = await fetch(`${API_BASE_URL}/submission/${submissionId}`, {
             headers: {
-                'x-admin-wallet': ADMIN_WALLET
+                'x-admin-wallet': adminWallet
             }
         });
         const data = await response.json();
@@ -238,7 +327,14 @@ async function showSubmissionDetails(submissionId) {
                     </div>
                     <div class="detail-row">
                         <strong>Submitted:</strong>
-                        ${new Date(sub.dateSubmitted).toLocaleString()}
+                        ${sub.dateSubmitted ? (() => {
+                            try {
+                                const date = new Date(sub.dateSubmitted);
+                                return isNaN(date.getTime()) ? 'N/A' : date.toLocaleString();
+                            } catch (e) {
+                                return 'N/A';
+                            }
+                        })() : 'N/A'}
                     </div>
                 </div>
             `;
@@ -259,15 +355,25 @@ async function showSubmissionDetails(submissionId) {
 document.getElementById('approveBtn')?.addEventListener('click', async () => {
     const modal = document.getElementById('submissionModal');
     const submissionId = modal.dataset.submissionId;
+    const approveBtn = document.getElementById('approveBtn');
 
     if (!submissionId) return;
 
+    // Disable button and show loading state immediately
+    if (approveBtn) {
+        approveBtn.disabled = true;
+        approveBtn.textContent = 'Approving...';
+    }
+
     try {
+        // Ensure admin wallet is lowercase for backend comparison
+        const adminWallet = (window.ADMIN_WALLET_ADDRESS || '').toLowerCase();
+        
         const response = await fetch(`${API_BASE_URL}/approve`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-admin-wallet': ADMIN_WALLET
+                'x-admin-wallet': adminWallet
             },
             body: JSON.stringify({
                 submissionId: submissionId
@@ -277,53 +383,89 @@ document.getElementById('approveBtn')?.addEventListener('click', async () => {
         const data = await response.json();
 
         if (data.success) {
-            alert('Submission approved successfully!');
+            // Close modal first for immediate feedback
             modal.style.display = 'none';
-            loadSubmissions();
+            
+            // Use setTimeout to allow UI update before reloading
+            setTimeout(() => {
+                loadSubmissions();
+            }, 0);
         } else {
             alert(data.message || 'Failed to approve submission');
+            if (approveBtn) {
+                approveBtn.disabled = false;
+                approveBtn.textContent = 'Approve';
+            }
         }
     } catch (error) {
         console.error('Error approving submission:', error);
         alert('Error approving submission');
+        if (approveBtn) {
+            approveBtn.disabled = false;
+            approveBtn.textContent = 'Approve';
+        }
     }
 });
 
 document.getElementById('rejectBtn')?.addEventListener('click', async () => {
     const modal = document.getElementById('submissionModal');
     const submissionId = modal.dataset.submissionId;
+    const rejectBtn = document.getElementById('rejectBtn');
 
     if (!submissionId) return;
 
-    const reason = prompt('Please provide a reason for rejection (optional):');
-    
-    if (reason === null) return; // User cancelled
+    // Use setTimeout to allow UI to update before blocking prompt
+    setTimeout(async () => {
+        const reason = prompt('Please provide a reason for rejection (optional):');
+        
+        if (reason === null) return; // User cancelled
 
-    try {
-        const response = await fetch(`${API_BASE_URL}/reject`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-admin-wallet': ADMIN_WALLET
-            },
-            body: JSON.stringify({
-                submissionId: submissionId,
-                reason: reason || ''
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            alert('Submission rejected');
-            modal.style.display = 'none';
-            loadSubmissions();
-        } else {
-            alert(data.message || 'Failed to reject submission');
+        // Disable button and show loading state
+        if (rejectBtn) {
+            rejectBtn.disabled = true;
+            rejectBtn.textContent = 'Rejecting...';
         }
-    } catch (error) {
-        console.error('Error rejecting submission:', error);
-        alert('Error rejecting submission');
-    }
-});
 
+        try {
+            // Ensure admin wallet is lowercase for backend comparison
+            const adminWallet = (window.ADMIN_WALLET_ADDRESS || '').toLowerCase();
+            
+            const response = await fetch(`${API_BASE_URL}/reject`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-admin-wallet': adminWallet
+                },
+                body: JSON.stringify({
+                    submissionId: submissionId,
+                    reason: reason || ''
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Close modal first for immediate feedback
+                modal.style.display = 'none';
+                
+                // Use setTimeout to allow UI update before reloading
+                setTimeout(() => {
+                    loadSubmissions();
+                }, 0);
+            } else {
+                alert(data.message || 'Failed to reject submission');
+                if (rejectBtn) {
+                    rejectBtn.disabled = false;
+                    rejectBtn.textContent = 'Reject';
+                }
+            }
+        } catch (error) {
+            console.error('Error rejecting submission:', error);
+            alert('Error rejecting submission');
+            if (rejectBtn) {
+                rejectBtn.disabled = false;
+                rejectBtn.textContent = 'Reject';
+            }
+        }
+    }, 0);
+});

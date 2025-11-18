@@ -371,8 +371,16 @@ app.post('/api/register', checkDatabase, async (req, res) => {
             githubLink,
             mainContract,
             optionalContract1,
-            optionalContract2
+            optionalContract2,
+            verificationSignature
         } = req.body;
+
+        console.log('📝 Registration request received:', {
+            walletAddress,
+            xUsername,
+            mainContract,
+            hasSignature: !!verificationSignature
+        });
 
         // Validation
         if (!walletAddress || !xUsername || !mainContract) {
@@ -398,50 +406,189 @@ app.post('/api/register', checkDatabase, async (req, res) => {
             });
         }
 
+        // VERIFY CONTRACT OWNERSHIP - CRITICAL SECURITY CHECK
+        const deployer = await getContractDeployer(mainContract);
+        
+        if (deployer) {
+            // If deployer found, verify wallet matches OR signature is valid
+            const walletMatches = deployer.toLowerCase() === walletAddress.toLowerCase();
+            
+            if (!walletMatches) {
+                // Wallet doesn't match deployer - require signature
+                if (!verificationSignature) {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Contract ownership verification required. Please sign the verification message first.'
+                    });
+                }
+                
+                // Verify signature matches deployer
+                try {
+                    const message = `I am the owner of contract ${mainContract}. Signing to verify ownership for BuilderHub.`;
+                    const recoveredAddress = ethers.utils.verifyMessage(message, verificationSignature);
+                    
+                    if (recoveredAddress.toLowerCase() !== deployer.toLowerCase()) {
+                        return res.status(403).json({
+                            success: false,
+                            message: 'Signature verification failed. The signature does not match the contract deployer.'
+                        });
+                    }
+                    
+                    console.log('✅ Signature verified - matches deployer');
+                } catch (sigError) {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Invalid signature format'
+                    });
+                }
+            } else {
+                console.log('✅ Wallet matches contract deployer');
+            }
+        } else {
+            // Deployer not found - require signature as proof
+            if (!verificationSignature) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Contract ownership verification required. Please sign the verification message first.'
+                });
+            }
+            
+            // Verify signature matches connected wallet
+            try {
+                const message = `I am the owner of contract ${mainContract}. Signing to verify ownership for BuilderHub.`;
+                const recoveredAddress = ethers.utils.verifyMessage(message, verificationSignature);
+                
+                if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Signature verification failed. The signature does not match your connected wallet.'
+                    });
+                }
+                
+                console.log('✅ Signature verified - matches connected wallet');
+            } catch (sigError) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Invalid signature format'
+                });
+            }
+        }
+
         // Check if wallet already exists
         const existing = await pool.query(
             'SELECT * FROM developers WHERE wallet_address = $1',
             [walletAddress.toLowerCase()]
         );
 
-        if (existing.rows.length > 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Wallet address already registered'
-            });
-        }
-
         // Format X username
         const formattedXUsername = xUsername.startsWith('@') ? xUsername : `@${xUsername}`;
 
-        // Insert developer
-        const result = await pool.query(
-            `INSERT INTO developers (
-                wallet_address, x_username, project_x, github_link,
-                main_contract, optional_contract_1, optional_contract_2,
-                is_approved, is_rejected
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING id`,
-            [
-                walletAddress.toLowerCase(),
-                formattedXUsername,
-                projectX || null,
-                githubLink || null,
-                mainContract.toLowerCase(),
-                optionalContract1?.toLowerCase() || null,
-                optionalContract2?.toLowerCase() || null,
-                false,
-                false
-            ]
-        );
+        // Clean empty strings to null
+        const cleanProjectX = projectX && projectX.trim() ? projectX.trim() : null;
+        const cleanGithubLink = githubLink && githubLink.trim() ? githubLink.trim() : null;
+        const cleanOptional1 = optionalContract1 && optionalContract1.trim() ? optionalContract1.trim().toLowerCase() : null;
+        const cleanOptional2 = optionalContract2 && optionalContract2.trim() ? optionalContract2.trim().toLowerCase() : null;
 
+        let result;
+        let isResubmission = false;
+
+        if (existing.rows.length > 0) {
+            const existingRecord = existing.rows[0];
+            
+            // If already approved, don't allow resubmission
+            if (existingRecord.is_approved) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Your profile is already approved. No need to resubmit.'
+                });
+            }
+            
+            // If pending (not rejected), don't allow resubmission
+            if (!existingRecord.is_rejected) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Your profile is already pending review. Please wait for admin approval.'
+                });
+            }
+            
+            // If rejected, allow resubmission - UPDATE the existing record
+            isResubmission = true;
+            console.log('🔄 Resubmitting rejected profile. Updating existing record ID:', existingRecord.id);
+            
+            result = await pool.query(
+                `UPDATE developers SET
+                    x_username = $1,
+                    project_x = $2,
+                    github_link = $3,
+                    main_contract = $4,
+                    optional_contract_1 = $5,
+                    optional_contract_2 = $6,
+                    verification_signature = $7,
+                    is_approved = FALSE,
+                    is_rejected = FALSE,
+                    rejection_reason = NULL,
+                    date_submitted = CURRENT_TIMESTAMP,
+                    last_updated = CURRENT_TIMESTAMP
+                WHERE wallet_address = $8
+                RETURNING *`,
+                [
+                    formattedXUsername,
+                    cleanProjectX,
+                    cleanGithubLink,
+                    mainContract.toLowerCase(),
+                    cleanOptional1,
+                    cleanOptional2,
+                    verificationSignature || null,
+                    walletAddress.toLowerCase()
+                ]
+            );
+            
+            console.log('✅ Rejected profile resubmitted successfully. ID:', result.rows[0].id);
+        } else {
+            // New registration - INSERT new record
+            console.log('💾 Storing new developer data:', {
+                walletAddress: walletAddress.toLowerCase(),
+                xUsername: formattedXUsername,
+                mainContract: mainContract.toLowerCase(),
+                projectX: cleanProjectX,
+                githubLink: cleanGithubLink,
+                hasSignature: !!verificationSignature
+            });
+
+            result = await pool.query(
+                `INSERT INTO developers (
+                    wallet_address, x_username, project_x, github_link,
+                    main_contract, optional_contract_1, optional_contract_2,
+                    verification_signature, is_approved, is_rejected
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                RETURNING *`,
+                [
+                    walletAddress.toLowerCase(),
+                    formattedXUsername,
+                    cleanProjectX,
+                    cleanGithubLink,
+                    mainContract.toLowerCase(),
+                    cleanOptional1,
+                    cleanOptional2,
+                    verificationSignature || null,
+                    false,
+                    false
+                ]
+            );
+
+            console.log('✅ Developer registered successfully. ID:', result.rows[0].id);
+        }
+        
         res.json({
             success: true,
-            message: 'Profile submitted successfully. Waiting for admin approval.',
-            profileId: result.rows[0].id
+            message: isResubmission 
+                ? 'Profile resubmitted successfully. Waiting for admin approval.'
+                : 'Profile submitted successfully. Waiting for admin approval.',
+            profileId: result.rows[0].id,
+            isResubmission: isResubmission
         });
     } catch (error) {
-        console.error('Register error:', error);
+        console.error('❌ Register error:', error);
         res.status(500).json({
             success: false,
             message: 'Error registering developer',
@@ -814,19 +961,30 @@ app.get('/api/leaderboard', checkDatabase, async (req, res) => {
  * Get pending submissions (Admin only)
  * GET /api/pending-submissions?status=pending|approved|rejected
  */
-app.get('/api/pending-submissions', async (req, res) => {
+app.get('/api/pending-submissions', checkDatabase, async (req, res) => {
     try {
         // Check admin wallet (in production, verify from request headers/auth)
         const adminWallet = req.headers['x-admin-wallet']?.toLowerCase();
         
-        if (adminWallet !== ADMIN_WALLET) {
+        console.log('🔐 Admin check:', {
+            received: adminWallet,
+            expected: ADMIN_WALLET,
+            match: adminWallet === ADMIN_WALLET,
+            receivedType: typeof adminWallet,
+            expectedType: typeof ADMIN_WALLET
+        });
+        
+        if (!adminWallet || adminWallet !== ADMIN_WALLET) {
+            console.log('❌ Admin access denied - wallet mismatch');
             return res.status(403).json({
                 success: false,
-                message: 'Admin access required'
+                message: 'Admin access required. Please connect the admin wallet.'
             });
         }
 
         const status = req.query.status || 'pending';
+        console.log('📋 Fetching submissions with status:', status);
+        
         let query;
 
         if (status === 'approved') {
@@ -837,14 +995,37 @@ app.get('/api/pending-submissions', async (req, res) => {
             query = 'SELECT * FROM developers WHERE is_approved = FALSE AND is_rejected = FALSE ORDER BY date_submitted DESC';
         }
 
+        console.log('🔍 Executing query:', query);
         const result = await pool.query(query);
+        console.log('📊 Database returned', result.rows.length, 'rows');
+
+        // Map database columns to frontend expected format
+        const submissions = result.rows.map(row => {
+            const submission = {
+                id: row.id,
+                walletAddress: row.wallet_address,
+                xUsername: row.x_username,
+                projectX: row.project_x,
+                githubLink: row.github_link,
+                mainContract: row.main_contract,
+                optionalContract1: row.optional_contract_1,
+                optionalContract2: row.optional_contract_2,
+                isApproved: row.is_approved,
+                isRejected: row.is_rejected,
+                dateSubmitted: row.date_submitted
+            };
+            console.log('📝 Mapped submission:', submission.id, submission.walletAddress);
+            return submission;
+        });
+
+        console.log(`✅ Returning ${submissions.length} submissions for status: ${status}`);
 
         res.json({
             success: true,
-            submissions: result.rows
+            submissions: submissions
         });
     } catch (error) {
-        console.error('Get pending submissions error:', error);
+        console.error('❌ Get pending submissions error:', error);
         res.status(500).json({
             success: false,
             message: 'Error fetching submissions',
@@ -857,7 +1038,7 @@ app.get('/api/pending-submissions', async (req, res) => {
  * Get single submission (Admin only)
  * GET /api/submission/:id
  */
-app.get('/api/submission/:id', async (req, res) => {
+app.get('/api/submission/:id', checkDatabase, async (req, res) => {
     try {
         const adminWallet = req.headers['x-admin-wallet']?.toLowerCase();
         
@@ -868,21 +1049,45 @@ app.get('/api/submission/:id', async (req, res) => {
             });
         }
 
+        const submissionId = parseInt(req.params.id);
+        console.log('🔍 Fetching submission ID:', submissionId);
+
         const result = await pool.query(
             'SELECT * FROM developers WHERE id = $1',
-            [req.params.id]
+            [submissionId]
         );
 
         if (result.rows.length === 0) {
+            console.log('❌ Submission not found for ID:', submissionId);
             return res.status(404).json({
                 success: false,
                 message: 'Submission not found'
             });
         }
 
+        const submission = result.rows[0];
+        console.log('✅ Submission found:', {
+            id: submission.id,
+            wallet: submission.wallet_address,
+            xUsername: submission.x_username
+        });
+
+        // Map database columns to frontend expected format
         res.json({
             success: true,
-            submission: result.rows[0]
+            submission: {
+                id: submission.id,
+                walletAddress: submission.wallet_address,
+                xUsername: submission.x_username,
+                projectX: submission.project_x,
+                githubLink: submission.github_link,
+                mainContract: submission.main_contract,
+                optionalContract1: submission.optional_contract_1,
+                optionalContract2: submission.optional_contract_2,
+                isApproved: submission.is_approved,
+                isRejected: submission.is_rejected,
+                dateSubmitted: submission.date_submitted
+            }
         });
     } catch (error) {
         console.error('Get submission error:', error);

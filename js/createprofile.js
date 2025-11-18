@@ -132,11 +132,14 @@ async function signVerificationMessage(contractAddress) {
 
         if (data.success && data.verified) {
             showContractStatus('signatureStatus', '✓ Signature verified successfully', 'success');
+            // Store signature for form submission
+            window.lastVerifiedSignature = signature;
             const submitBtn = document.getElementById('submitProfileBtn');
             if (submitBtn) submitBtn.disabled = false;
             return true;
         } else {
             showContractStatus('signatureStatus', data.message || 'Signature verification failed', 'error');
+            window.lastVerifiedSignature = null;
             return false;
         }
     } catch (error) {
@@ -157,13 +160,6 @@ function showContractStatus(elementId, message, type) {
 // ============================================
 // Form Submission
 // ============================================
-document.getElementById('verifyMainContractBtn')?.addEventListener('click', async () => {
-    const contractAddress = document.getElementById('mainContract').value;
-    if (contractAddress) {
-        await verifyContractOwnership(contractAddress);
-    }
-});
-
 document.getElementById('signMessageBtn')?.addEventListener('click', async () => {
     const contractAddress = document.getElementById('mainContract').value;
     if (contractAddress) {
@@ -179,20 +175,84 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
         return;
     }
 
+    // Get signature if it was verified
+    let storedSignature = null;
+    const signatureStatus = document.getElementById('signatureStatus');
+    if (signatureStatus && signatureStatus.textContent.includes('verified successfully')) {
+        // Signature was verified, we need to get it from the verification
+        // For now, we'll require signature verification before submission
+        const contractAddress = document.getElementById('mainContract').value;
+        if (contractAddress) {
+            // Check if signature was stored (we'll need to store it when verified)
+            storedSignature = window.lastVerifiedSignature || null;
+        }
+    }
+
     const formData = {
         walletAddress: userAddress,
-        xUsername: document.getElementById('xUsername').value,
-        projectX: document.getElementById('projectX').value || null,
-        githubLink: document.getElementById('githubLink').value || null,
-        mainContract: document.getElementById('mainContract').value,
-        optionalContract1: document.getElementById('optionalContract1').value || null,
-        optionalContract2: document.getElementById('optionalContract2').value || null
+        xUsername: document.getElementById('xUsername').value.trim(),
+        projectX: document.getElementById('projectX').value.trim() || null,
+        githubLink: document.getElementById('githubLink').value.trim() || null,
+        mainContract: document.getElementById('mainContract').value.trim(),
+        optionalContract1: document.getElementById('optionalContract1').value.trim() || null,
+        optionalContract2: document.getElementById('optionalContract2').value.trim() || null,
+        verificationSignature: storedSignature
     };
 
     // Validate required fields
     if (!formData.xUsername || !formData.mainContract) {
         alert('Please fill in all required fields');
         return;
+    }
+
+    // Validate contract address format
+    if (!formData.mainContract.match(/^0x[a-fA-F0-9]{40}$/)) {
+        alert('Please enter a valid contract address');
+        return;
+    }
+
+    // Check if signature verification is needed
+    const contractAddress = formData.mainContract;
+    const needsVerification = !window.lastVerifiedSignature;
+    
+    if (needsVerification) {
+        // Try to verify ownership first
+        try {
+            const verifyResponse = await fetch(`${API_BASE_URL}/verify-contract-owner`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contractAddress: contractAddress,
+                    walletAddress: userAddress
+                })
+            });
+
+            if (verifyResponse.ok) {
+                const verifyData = await verifyResponse.json();
+                
+                if (verifyData.success && !verifyData.deployerMatches) {
+                    // Deployer doesn't match - require signature
+                    alert('Contract ownership verification required. Please sign the verification message first.');
+                    document.getElementById('signatureSection').style.display = 'block';
+                    return;
+                } else if (verifyData.success && verifyData.deployerMatches) {
+                    // Deployer matches - no signature needed
+                    console.log('✅ Wallet matches deployer, no signature needed');
+                    window.lastVerifiedSignature = null; // Clear any old signature
+                } else {
+                    // Deployer not found - require signature
+                    alert('Contract ownership verification required. Please sign the verification message first.');
+                    document.getElementById('signatureSection').style.display = 'block';
+                    return;
+                }
+            }
+        } catch (verifyError) {
+            console.error('Verification check error:', verifyError);
+            // If verification check fails, require signature as safety measure
+            alert('Contract ownership verification required. Please sign the verification message first.');
+            document.getElementById('signatureSection').style.display = 'block';
+            return;
+        }
     }
 
     // Validate X username format
@@ -213,10 +273,23 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
             body: JSON.stringify(formData)
         });
 
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+            console.error('API Error:', errorData);
+            alert(errorData.message || 'Failed to submit profile. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Profile';
+            return;
+        }
+
         const data = await response.json();
+        console.log('Registration response:', data);
 
         if (data.success) {
-            alert('Profile submitted successfully! Please wait for admin approval.');
+            const message = data.isResubmission 
+                ? 'Profile resubmitted successfully! Please wait for admin approval.'
+                : 'Profile submitted successfully! Please wait for admin approval.';
+            alert(message);
             window.location.href = 'index.html';
         } else {
             alert(data.message || 'Failed to submit profile. Please try again.');
@@ -225,17 +298,56 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
         }
     } catch (error) {
         console.error('Error submitting profile:', error);
-        alert('Error submitting profile. Please try again.');
+        alert('Error submitting profile: ' + error.message);
         document.getElementById('submitProfileBtn').disabled = false;
         document.getElementById('submitProfileBtn').textContent = 'Submit Profile';
     }
 });
 
-// Auto-verify on contract address change
+// Auto-check contract ownership when contract address is entered
 document.getElementById('mainContract')?.addEventListener('blur', async function() {
-    const contractAddress = this.value;
-    if (contractAddress && contractAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
-        await verifyContractOwnership(contractAddress);
+    const contractAddress = this.value.trim();
+    if (!contractAddress || !contractAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+        return;
+    }
+
+    if (!userAddress) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/verify-contract-owner`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contractAddress: contractAddress,
+                walletAddress: userAddress
+            })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const signatureSection = document.getElementById('signatureSection');
+            
+            if (data.success && !data.deployerMatches) {
+                // Deployer doesn't match - show signature section
+                if (signatureSection) signatureSection.style.display = 'block';
+                window.lastVerifiedSignature = null; // Clear old signature
+            } else if (data.success && data.deployerMatches) {
+                // Deployer matches - hide signature section
+                if (signatureSection) signatureSection.style.display = 'none';
+                window.lastVerifiedSignature = null; // No signature needed
+            } else {
+                // Deployer not found - show signature section
+                if (signatureSection) signatureSection.style.display = 'block';
+                window.lastVerifiedSignature = null; // Clear old signature
+            }
+        }
+    } catch (error) {
+        console.error('Auto-verification error:', error);
+        // Show signature section as safety measure
+        const signatureSection = document.getElementById('signatureSection');
+        if (signatureSection) signatureSection.style.display = 'block';
     }
 });
 

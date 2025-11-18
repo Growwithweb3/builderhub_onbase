@@ -58,8 +58,6 @@
                         <label for="mainContract">Main Contract Address <span class="required">*</span></label>
                         <input type="text" id="mainContract" name="mainContract" placeholder="0x..." required pattern="^0x[a-fA-F0-9]{40}$">
                         <small>Your main smart contract address on Base</small>
-                        <button type="button" id="verifyMainContractBtn" class="btn btn-secondary btn-sm">Verify Ownership</button>
-                        <div id="mainContractStatus" class="contract-status"></div>
                     </div>
 
                     <!-- Optional Contract Address 1 -->
@@ -79,8 +77,8 @@
                     <!-- Signature Verification -->
                     <div id="signatureSection" class="signature-section" style="display: none;">
                         <div class="form-group">
-                            <label>Contract Ownership Verification</label>
-                            <p class="verification-message">Please sign a message to verify contract ownership</p>
+                            <label>Contract Ownership Verification <span class="required">*</span></label>
+                            <p class="verification-message">Your wallet does not match the contract deployer. Please sign a message to verify ownership.</p>
                             <button type="button" id="signMessageBtn" class="btn btn-primary">Sign Verification Message</button>
                             <div id="signatureStatus" class="contract-status"></div>
                         </div>
@@ -88,7 +86,7 @@
 
                     <!-- Submit Button -->
                     <div class="form-actions">
-                        <button type="submit" id="submitProfileBtn" class="btn btn-primary btn-large" disabled>Submit Profile</button>
+                        <button type="submit" id="submitProfileBtn" class="btn btn-primary btn-large">Submit Profile</button>
                         <p class="form-note">Your profile will be reviewed by admin before approval</p>
                     </div>
                 </form>
