@@ -88,13 +88,16 @@ function hideWalletInfo() {
     if (connectCtaBtn) connectCtaBtn.style.display = 'block';
 }
 
+// API Base URL
+const API_BASE_URL = window.API_BASE_URL || 'https://builderhubonbase-production.up.railway.app/api';
+
 // Check user status and redirect
 async function checkUserStatus() {
     if (!userAddress) return;
 
     try {
         // Call backend API to check if user is approved
-        const response = await fetch(`/api/check-status/${userAddress}`);
+        const response = await fetch(`${API_BASE_URL}/check-status/${userAddress}`);
         const data = await response.json();
 
         if (data.approved) {
@@ -165,7 +168,7 @@ async function loadLeaderboard(sortBy = 'transactions') {
     if (!tableBody) return;
 
     try {
-        const response = await fetch(`/api/leaderboard?sort=${sortBy}`);
+        const response = await fetch(`${API_BASE_URL}/leaderboard?sort=${sortBy}`);
         const data = await response.json();
 
         if (data.success && data.leaderboard) {
@@ -222,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ============================================
 async function loadStats() {
     try {
-        const response = await fetch('/api/stats');
+        const response = await fetch(`${API_BASE_URL}/stats`);
         const data = await response.json();
 
         if (data.success) {

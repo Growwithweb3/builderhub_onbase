@@ -39,6 +39,11 @@ function updateWalletUI() {
 document.addEventListener('DOMContentLoaded', initWallet);
 
 // ============================================
+// API Configuration
+// ============================================
+const API_BASE_URL = window.API_BASE_URL || 'https://builderhubonbase-production.up.railway.app/api';
+
+// ============================================
 // Contract Verification
 // ============================================
 async function verifyContractOwnership(contractAddress) {
@@ -49,7 +54,7 @@ async function verifyContractOwnership(contractAddress) {
 
     try {
         // Check if contract deployer matches connected wallet
-        const response = await fetch(`/api/verify-contract-owner`, {
+        const response = await fetch(`${API_BASE_URL}/verify-contract-owner`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -92,7 +97,7 @@ async function signVerificationMessage(contractAddress) {
         const signature = await signer.signMessage(message);
 
         // Verify signature with backend
-        const response = await fetch(`/api/verify-signature`, {
+        const response = await fetch(`${API_BASE_URL}/verify-signature`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -181,7 +186,7 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
         submitBtn.disabled = true;
         submitBtn.textContent = 'Submitting...';
 
-        const response = await fetch('/api/register', {
+        const response = await fetch(`${API_BASE_URL}/register`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

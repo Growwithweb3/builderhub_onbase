@@ -112,6 +112,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================
+// API Configuration
+// ============================================
+const API_BASE_URL = window.API_BASE_URL || 'https://builderhubonbase-production.up.railway.app/api';
+const ADMIN_WALLET = '0xb0dfc6ca6aafd3b0719949aa029d30d79fed30a4';
+
+// ============================================
 // Load Submissions
 // ============================================
 async function loadSubmissions() {
@@ -120,7 +126,11 @@ async function loadSubmissions() {
     if (!submissionsList) return;
 
     try {
-        const response = await fetch(`/api/pending-submissions?status=${currentFilter}`);
+        const response = await fetch(`${API_BASE_URL}/pending-submissions?status=${currentFilter}`, {
+            headers: {
+                'x-admin-wallet': ADMIN_WALLET
+            }
+        });
         const data = await response.json();
 
         if (data.success && data.submissions) {
@@ -176,7 +186,11 @@ async function showSubmissionDetails(submissionId) {
     const detailsDiv = document.getElementById('submissionDetails');
 
     try {
-        const response = await fetch(`/api/submission/${submissionId}`);
+        const response = await fetch(`${API_BASE_URL}/submission/${submissionId}`, {
+            headers: {
+                'x-admin-wallet': ADMIN_WALLET
+            }
+        });
         const data = await response.json();
 
         if (data.success && data.submission) {
@@ -249,10 +263,11 @@ document.getElementById('approveBtn')?.addEventListener('click', async () => {
     if (!submissionId) return;
 
     try {
-        const response = await fetch('/api/approve', {
+        const response = await fetch(`${API_BASE_URL}/approve`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'x-admin-wallet': ADMIN_WALLET
             },
             body: JSON.stringify({
                 submissionId: submissionId
@@ -285,10 +300,11 @@ document.getElementById('rejectBtn')?.addEventListener('click', async () => {
     if (reason === null) return; // User cancelled
 
     try {
-        const response = await fetch('/api/reject', {
+        const response = await fetch(`${API_BASE_URL}/reject`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'x-admin-wallet': ADMIN_WALLET
             },
             body: JSON.stringify({
                 submissionId: submissionId,

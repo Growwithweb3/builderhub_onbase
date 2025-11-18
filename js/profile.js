@@ -60,6 +60,11 @@ document.getElementById('disconnectWalletBtn')?.addEventListener('click', () => 
 document.addEventListener('DOMContentLoaded', initWallet);
 
 // ============================================
+// API Configuration
+// ============================================
+const API_BASE_URL = window.API_BASE_URL || 'https://builderhubonbase-production.up.railway.app/api';
+
+// ============================================
 // Load Profile Data
 // ============================================
 async function loadProfileData() {
@@ -67,7 +72,7 @@ async function loadProfileData() {
 
     try {
         // Check if user is approved
-        const statusResponse = await fetch(`/api/check-status/${userAddress}`);
+        const statusResponse = await fetch(`${API_BASE_URL}/check-status/${userAddress}`);
         const statusData = await statusResponse.status === 200 ? await statusResponse.json() : null;
 
         if (!statusData || !statusData.approved) {
@@ -77,7 +82,7 @@ async function loadProfileData() {
         }
 
         // Load profile data
-        const profileResponse = await fetch(`/api/profile/${userAddress}`);
+        const profileResponse = await fetch(`${API_BASE_URL}/profile/${userAddress}`);
         const profileData = await profileResponse.json();
 
         if (profileData.success) {
@@ -147,7 +152,7 @@ async function loadStats() {
     if (!userAddress) return;
 
     try {
-        const response = await fetch(`/api/stats/${userAddress}`);
+        const response = await fetch(`${API_BASE_URL}/stats/${userAddress}`);
         const data = await response.json();
 
         if (data.success) {
