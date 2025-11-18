@@ -163,113 +163,127 @@ app.use((req, res, next) => {
 async function getContractDeployer(contractAddress) {
     try {
         console.log(`🔍 Finding deployer for contract: ${contractAddress}`);
+        const normalizedAddress = contractAddress.toLowerCase();
         
-        // Method 1: Try Basescan API first (if API key works)
+        if (!BASESCAN_API_KEY) {
+            console.warn('⚠️  BASESCAN_API_KEY not configured');
+        }
+        
+        // Method 1: Use Basescan transaction list API - MOST RELIABLE
+        // Get the first transaction(s) to find the contract creation transaction
         if (BASESCAN_API_KEY) {
             try {
+                console.log('🔍 Method 1: Querying Basescan transaction list API...');
+                const txResponse = await axios.get('https://api.basescan.org/api', {
+                    params: {
+                        module: 'account',
+                        action: 'txlist',
+                        address: normalizedAddress,
+                        startblock: 0,
+                        endblock: 99999999,
+                        page: 1,
+                        offset: 20, // Get first 20 transactions to find creation
+                        sort: 'asc',
+                        apikey: BASESCAN_API_KEY
+                    },
+                    timeout: 15000
+                });
+
+                console.log('📡 Transaction list API response:', {
+                    status: txResponse.data.status,
+                    resultCount: txResponse.data.result?.length,
+                    message: txResponse.data.message
+                });
+
+                if (txResponse.data.status === '1' && txResponse.data.result?.length > 0) {
+                    // Look for the creation transaction
+                    // Contract creation: 'to' is empty/null OR 'contractAddress' field exists
+                    for (const tx of txResponse.data.result) {
+                        const txTo = (tx.to || '').toLowerCase();
+                        const txFrom = (tx.from || '').toLowerCase();
+                        const txContractAddress = (tx.contractAddress || '').toLowerCase();
+                        
+                        // Check if this is a contract creation transaction
+                        const isCreationTx = (!txTo || txTo === '' || txTo === '0x') || 
+                                            (txContractAddress === normalizedAddress) ||
+                                            (txTo === normalizedAddress && txFrom !== normalizedAddress);
+                        
+                        if (isCreationTx && txFrom) {
+                            const deployer = txFrom.toLowerCase();
+                            console.log(`✅ Contract deployer found (from transaction ${tx.hash}): ${deployer}`);
+                            return deployer;
+                        }
+                    }
+                    
+                    // Fallback: Use first transaction's 'from' address
+                    // This handles factory contracts where creation tx might not be obvious
+                    const firstTx = txResponse.data.result[0];
+                    if (firstTx.from) {
+                        const deployer = firstTx.from.toLowerCase();
+                        console.log(`✅ Contract deployer (from first transaction fallback): ${deployer}`);
+                        return deployer;
+                    }
+                } else if (txResponse.data.message) {
+                    console.log('⚠️  API message:', txResponse.data.message);
+                }
+            } catch (txApiError) {
+                console.log('⚠️  Transaction list API failed:', txApiError.message);
+                if (txApiError.response) {
+                    console.log('Response:', JSON.stringify(txApiError.response.data, null, 2));
+                }
+            }
+        }
+
+        // Method 2: Try Basescan getcontractcreation API
+        if (BASESCAN_API_KEY) {
+            try {
+                console.log('🔍 Method 2: Trying getcontractcreation API...');
                 const response = await axios.get('https://api.basescan.org/api', {
                     params: {
                         module: 'contract',
                         action: 'getcontractcreation',
-                        contractaddresses: contractAddress,
+                        contractaddresses: normalizedAddress,
                         apikey: BASESCAN_API_KEY
                     },
-                    timeout: 5000
+                    timeout: 10000
+                });
+
+                console.log('📡 getcontractcreation API response:', {
+                    status: response.data.status,
+                    result: response.data.result,
+                    message: response.data.message
                 });
 
                 if (response.data.status === '1' && response.data.result?.length > 0) {
-                    const deployer = response.data.result[0].contractCreator?.toLowerCase();
+                    const result = Array.isArray(response.data.result) ? response.data.result[0] : response.data.result;
+                    const deployer = (result.contractCreator || result.creator || result.from)?.toLowerCase();
                     if (deployer) {
-                        console.log(`✅ Contract deployer (Basescan API): ${deployer}`);
+                        console.log(`✅ Contract deployer (getcontractcreation API): ${deployer}`);
                         return deployer;
                     }
                 }
             } catch (apiError) {
-                console.log('⚠️  Basescan API failed, trying blockchain query...');
+                console.log('⚠️  getcontractcreation API failed:', apiError.message);
+                if (apiError.response) {
+                    console.log('Response:', JSON.stringify(apiError.response.data, null, 2));
+                }
             }
         }
 
-        // Method 2: Query blockchain directly using ethers.js (RELIABLE FALLBACK)
-        console.log('🔗 Querying Base blockchain directly...');
+        // Method 3: Verify contract exists on blockchain
+        console.log('🔍 Method 3: Verifying contract exists...');
         const provider = new ethers.providers.JsonRpcProvider(BASE_RPC_URL);
         
-        // Get the contract's creation transaction by checking internal transactions
-        // The deployer is the address that sent the contract creation transaction
         try {
-            // Get current block number
-            const currentBlock = await provider.getBlockNumber();
-            console.log(`📦 Current block: ${currentBlock}`);
-            
-            // Search backwards from current block to find contract creation
-            // Contract creation transactions have 'to' as null and create a contract
-            const searchBlocks = 10000; // Search last 10k blocks (adjust if needed)
-            const startBlock = Math.max(0, currentBlock - searchBlocks);
-            
-            console.log(`🔎 Searching blocks ${startBlock} to ${currentBlock}...`);
-            
-            // Get the contract's code to verify it exists
-            const code = await provider.getCode(contractAddress);
+            const code = await provider.getCode(normalizedAddress);
             if (code === '0x') {
                 console.error('❌ Contract does not exist at this address');
                 return null;
             }
             
-            // Try to find the creation transaction by checking recent blocks
-            // We'll use a more efficient method: check transaction receipts
-            // For Base, we can query the contract's first transaction
-            
-            // Alternative: Use Basescan transaction list API (more reliable than contract creation API)
-            if (BASESCAN_API_KEY) {
-                try {
-                    const txResponse = await axios.get('https://api.basescan.org/api', {
-                        params: {
-                            module: 'account',
-                            action: 'txlist',
-                            address: contractAddress,
-                            startblock: 0,
-                            endblock: 99999999,
-                            page: 1,
-                            offset: 1,
-                            sort: 'asc',
-                            apikey: BASESCAN_API_KEY
-                        },
-                        timeout: 5000
-                    });
-
-                    if (txResponse.data.status === '1' && txResponse.data.result?.length > 0) {
-                        const firstTx = txResponse.data.result[0];
-                        // For contract creation, the 'from' address is the deployer
-                        // But we need to check if 'to' is null (contract creation)
-                        if (firstTx.to === '' || firstTx.to === null || firstTx.to.toLowerCase() === contractAddress.toLowerCase()) {
-                            const deployer = firstTx.from.toLowerCase();
-                            console.log(`✅ Contract deployer (from first tx): ${deployer}`);
-                            return deployer;
-                        }
-                    }
-                } catch (txApiError) {
-                    console.log('⚠️  Transaction API also failed, trying direct blockchain query...');
-                }
-            }
-            
-            // Method 3: Direct blockchain query - get contract creation transaction hash
-            // This is more complex but doesn't require API
-            // We'll search for the transaction that created this contract
-            // by looking for transactions with null 'to' that resulted in this contract address
-            
-            // Get contract's first event or use a different approach
-            // Actually, the most reliable way is to use eth_getCode and trace back
-            // But for now, let's try getting the transaction receipt
-            
-            // Since direct blockchain search is complex, let's use a simpler approach:
-            // Check if we can get the transaction from the contract's first block
-            const contractBlock = await provider.getCode(contractAddress);
-            
-            // Try to get transaction by querying logs/events from early blocks
-            // For simplicity, let's use the Basescan transaction method as primary fallback
-            // If that fails, we'll need to tell user to manually verify
-            
-            console.log('⚠️  Could not automatically determine deployer from blockchain');
-            console.log('💡 Suggestion: User can sign message to prove ownership instead');
+            console.log('✅ Contract exists on blockchain');
+            console.log('⚠️  Could not determine deployer - all API methods failed');
+            console.log('💡 Please check Basescan API key and ensure it has proper permissions');
             
             return null;
             
