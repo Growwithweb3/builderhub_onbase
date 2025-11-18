@@ -162,6 +162,7 @@ app.use((req, res, next) => {
  */
 async function getContractDeployer(contractAddress) {
     try {
+        // Use Etherscan API V2 (works for Base chain)
         const response = await axios.get('https://api.basescan.org/api', {
             params: {
                 module: 'contract',
@@ -171,12 +172,22 @@ async function getContractDeployer(contractAddress) {
             }
         });
 
+        console.log('Basescan API Response:', {
+            status: response.data.status,
+            message: response.data.message,
+            resultCount: response.data.result?.length
+        });
+
         if (response.data.status === '1' && response.data.result?.length > 0) {
-            return response.data.result[0].contractCreator.toLowerCase();
+            const deployer = response.data.result[0].contractCreator.toLowerCase();
+            console.log(`Contract ${contractAddress} deployer: ${deployer}`);
+            return deployer;
+        } else {
+            console.warn('Contract deployer not found:', response.data.message || 'Unknown error');
+            return null;
         }
-        return null;
     } catch (error) {
-        console.error('Error fetching contract deployer:', error);
+        console.error('Error fetching contract deployer:', error.response?.data || error.message);
         return null;
     }
 }
@@ -351,10 +362,28 @@ app.post('/api/verify-contract-owner', async (req, res) => {
     try {
         const { contractAddress, walletAddress } = req.body;
 
+        console.log('Verify contract owner request:', { contractAddress, walletAddress });
+
         if (!contractAddress || !walletAddress) {
             return res.status(400).json({
                 success: false,
                 message: 'Missing contractAddress or walletAddress'
+            });
+        }
+
+        // Validate contract address format
+        if (!contractAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid contract address format'
+            });
+        }
+
+        // Validate wallet address format
+        if (!walletAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid wallet address format'
             });
         }
 
@@ -364,12 +393,14 @@ app.post('/api/verify-contract-owner', async (req, res) => {
         if (!deployer) {
             return res.status(400).json({
                 success: false,
-                message: 'Could not find contract deployer'
+                message: 'Could not find contract deployer. The contract may not exist on Base network or the API may be unavailable.'
             });
         }
 
         const deployerMatches = deployer === walletAddress.toLowerCase();
         const requiresSignature = !deployerMatches;
+
+        console.log('Deployer check:', { deployer, walletAddress: walletAddress.toLowerCase(), deployerMatches });
 
         res.json({
             success: true,
@@ -395,6 +426,8 @@ app.post('/api/verify-signature', async (req, res) => {
     try {
         const { contractAddress, walletAddress, message, signature } = req.body;
 
+        console.log('Verify signature request:', { contractAddress, walletAddress, hasMessage: !!message, hasSignature: !!signature });
+
         if (!contractAddress || !walletAddress || !message || !signature) {
             return res.status(400).json({
                 success: false,
@@ -402,8 +435,26 @@ app.post('/api/verify-signature', async (req, res) => {
             });
         }
 
+        // Validate addresses
+        if (!contractAddress.match(/^0x[a-fA-F0-9]{40}$/) || !walletAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid address format'
+            });
+        }
+
         // Recover address from signature
-        const recoveredAddress = ethers.utils.verifyMessage(message, signature);
+        let recoveredAddress;
+        try {
+            recoveredAddress = ethers.utils.verifyMessage(message, signature);
+            console.log('Recovered address from signature:', recoveredAddress);
+        } catch (sigError) {
+            console.error('Error recovering address from signature:', sigError);
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid signature format'
+            });
+        }
 
         // Get contract deployer
         const deployer = await getContractDeployer(contractAddress);
@@ -411,19 +462,31 @@ app.post('/api/verify-signature', async (req, res) => {
         if (!deployer) {
             return res.status(400).json({
                 success: false,
-                message: 'Could not find contract deployer'
+                message: 'Could not find contract deployer. The contract may not exist on Base network.'
             });
         }
 
         // Verify: recovered address must match deployer
         const verified = recoveredAddress.toLowerCase() === deployer.toLowerCase();
 
-        if (verified) {
-            // Update developer record with signature
-            await pool.query(
-                'UPDATE developers SET verification_signature = $1 WHERE wallet_address = $2',
-                [signature, walletAddress.toLowerCase()]
-            );
+        console.log('Signature verification:', {
+            recoveredAddress: recoveredAddress.toLowerCase(),
+            deployer: deployer.toLowerCase(),
+            verified
+        });
+
+        if (verified && pool) {
+            try {
+                // Update developer record with signature
+                await pool.query(
+                    'UPDATE developers SET verification_signature = $1 WHERE wallet_address = $2',
+                    [signature, walletAddress.toLowerCase()]
+                );
+                console.log('Signature saved to database');
+            } catch (dbError) {
+                console.error('Database update error:', dbError);
+                // Continue even if DB update fails
+            }
         }
 
         res.json({
@@ -431,7 +494,7 @@ app.post('/api/verify-signature', async (req, res) => {
             verified,
             message: verified 
                 ? 'Signature verified successfully' 
-                : 'Signature verification failed'
+                : 'Signature verification failed: The signer address does not match the contract deployer'
         });
     } catch (error) {
         console.error('Verify signature error:', error);

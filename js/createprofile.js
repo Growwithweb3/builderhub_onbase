@@ -65,15 +65,26 @@ async function verifyContractOwnership(contractAddress) {
             })
         });
 
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+            console.error('API Error:', errorData);
+            showContractStatus('mainContractStatus', errorData.message || 'Error verifying contract. Please try again.', 'error');
+            return false;
+        }
+
         const data = await response.json();
 
-        if (data.deployerMatches) {
+        if (data.success && data.deployerMatches) {
             showContractStatus('mainContractStatus', '✓ Contract ownership verified', 'success');
             return true;
-        } else {
+        } else if (data.success && !data.deployerMatches) {
             // Deployer doesn't match - require signature
             showContractStatus('mainContractStatus', 'Contract deployer does not match. Signature required.', 'pending');
-            document.getElementById('signatureSection').style.display = 'block';
+            const signatureSection = document.getElementById('signatureSection');
+            if (signatureSection) signatureSection.style.display = 'block';
+            return false;
+        } else {
+            showContractStatus('mainContractStatus', data.message || 'Error verifying contract. Please try again.', 'error');
             return false;
         }
     } catch (error) {
@@ -110,14 +121,22 @@ async function signVerificationMessage(contractAddress) {
             })
         });
 
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+            console.error('API Error:', errorData);
+            showContractStatus('signatureStatus', errorData.message || 'Signature verification failed', 'error');
+            return false;
+        }
+
         const data = await response.json();
 
-        if (data.verified) {
+        if (data.success && data.verified) {
             showContractStatus('signatureStatus', '✓ Signature verified successfully', 'success');
-            document.getElementById('submitProfileBtn').disabled = false;
+            const submitBtn = document.getElementById('submitProfileBtn');
+            if (submitBtn) submitBtn.disabled = false;
             return true;
         } else {
-            showContractStatus('signatureStatus', 'Signature verification failed', 'error');
+            showContractStatus('signatureStatus', data.message || 'Signature verification failed', 'error');
             return false;
         }
     } catch (error) {
