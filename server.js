@@ -24,32 +24,48 @@ const NODE_ENV = process.env.NODE_ENV || 'production';
 // ============================================
 // Database Connection
 // ============================================
-if (!DATABASE_URL) {
-    console.error('❌ DATABASE_URL environment variable is not set!');
-    process.exit(1);
+let pool = null;
+
+if (DATABASE_URL) {
+    try {
+        pool = new Pool({
+            connectionString: DATABASE_URL,
+            ssl: DATABASE_URL?.includes('railway') || DATABASE_URL?.includes('railway.internal') 
+                ? { rejectUnauthorized: false } 
+                : false,
+            // Connection pool settings
+            max: 20,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 10000,
+        });
+
+        // Test database connection (non-blocking)
+        pool.connect()
+            .then((client) => {
+                console.log('✅ Database connected successfully');
+                client.release();
+            })
+            .catch(err => {
+                console.error('❌ Database connection error:', err.message);
+                console.log('⚠️  Server will continue without database connection');
+            });
+    } catch (error) {
+        console.error('❌ Failed to create database pool:', error.message);
+        console.log('⚠️  Server will continue without database connection');
+    }
+} else {
+    console.warn('⚠️  DATABASE_URL not set - database features will be disabled');
 }
-
-const pool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: DATABASE_URL?.includes('railway') || DATABASE_URL?.includes('railway.internal') 
-        ? { rejectUnauthorized: false } 
-        : false
-});
-
-// Test database connection
-pool.connect()
-    .then(() => {
-        console.log('✅ Database connected successfully');
-    })
-    .catch(err => {
-        console.error('❌ Database connection error:', err.message);
-        // Don't exit - let server start and retry later
-    });
 
 // ============================================
 // Initialize Database Tables
 // ============================================
 async function initializeDatabase() {
+    if (!pool) {
+        console.log('⚠️  Skipping database initialization - no database connection');
+        return;
+    }
+    
     try {
         // Create developers table
         await pool.query(`
@@ -108,6 +124,19 @@ initializeDatabase().catch(err => {
     console.error('❌ Failed to initialize database:', err.message);
     // Continue anyway - tables might already exist
 });
+
+// ============================================
+// Helper Functions
+// ============================================
+function checkDatabase(req, res, next) {
+    if (!pool) {
+        return res.status(503).json({
+            success: false,
+            message: 'Database not available. Please check server configuration.'
+        });
+    }
+    next();
+}
 
 // ============================================
 // Middleware
@@ -224,7 +253,7 @@ app.get('/api/health', (req, res) => {
  * Register new developer
  * POST /api/register
  */
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', checkDatabase, async (req, res) => {
     try {
         const {
             walletAddress,
@@ -416,7 +445,7 @@ app.post('/api/verify-signature', async (req, res) => {
  * Check user status
  * GET /api/check-status/:walletAddress
  */
-app.get('/api/check-status/:walletAddress', async (req, res) => {
+app.get('/api/check-status/:walletAddress', checkDatabase, async (req, res) => {
     try {
         const walletAddress = req.params.walletAddress.toLowerCase();
 
@@ -454,7 +483,7 @@ app.get('/api/check-status/:walletAddress', async (req, res) => {
  * Get developer profile
  * GET /api/profile/:walletAddress
  */
-app.get('/api/profile/:walletAddress', async (req, res) => {
+app.get('/api/profile/:walletAddress', checkDatabase, async (req, res) => {
     try {
         const walletAddress = req.params.walletAddress.toLowerCase();
 
@@ -492,7 +521,7 @@ app.get('/api/profile/:walletAddress', async (req, res) => {
  * Get project statistics
  * GET /api/stats/:walletAddress
  */
-app.get('/api/stats/:walletAddress', async (req, res) => {
+app.get('/api/stats/:walletAddress', checkDatabase, async (req, res) => {
     try {
         const walletAddress = req.params.walletAddress.toLowerCase();
 
@@ -557,7 +586,7 @@ app.get('/api/stats/:walletAddress', async (req, res) => {
  * Get leaderboard
  * GET /api/leaderboard?sort=transactions|wallets
  */
-app.get('/api/leaderboard', async (req, res) => {
+app.get('/api/leaderboard', checkDatabase, async (req, res) => {
     try {
         const sortBy = req.query.sort || 'transactions';
         const limit = 100;
@@ -799,7 +828,7 @@ app.post('/api/reject', async (req, res) => {
  * Get global stats
  * GET /api/stats
  */
-app.get('/api/stats', async (req, res) => {
+app.get('/api/stats', checkDatabase, async (req, res) => {
     try {
         const developers = await pool.query(
             'SELECT COUNT(*) as count FROM developers WHERE is_approved = TRUE'
