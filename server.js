@@ -410,68 +410,27 @@ app.post('/api/register', checkDatabase, async (req, res) => {
         const deployer = await getContractDeployer(mainContract);
         
         if (deployer) {
-            // If deployer found, verify wallet matches OR signature is valid
+            // Deployer found - STRICT VERIFICATION: Only deployer wallet can submit
             const walletMatches = deployer.toLowerCase() === walletAddress.toLowerCase();
             
             if (!walletMatches) {
-                // Wallet doesn't match deployer - require signature
-                if (!verificationSignature) {
-                    return res.status(403).json({
-                        success: false,
-                        message: 'Contract ownership verification required. Please sign the verification message first.'
-                    });
-                }
-                
-                // Verify signature matches deployer
-                try {
-                    const message = `I am the owner of contract ${mainContract}. Signing to verify ownership for BuilderHub.`;
-                    const recoveredAddress = ethers.utils.verifyMessage(message, verificationSignature);
-                    
-                    if (recoveredAddress.toLowerCase() !== deployer.toLowerCase()) {
-                        return res.status(403).json({
-                            success: false,
-                            message: 'Signature verification failed. The signature does not match the contract deployer.'
-                        });
-                    }
-                    
-                    console.log('✅ Signature verified - matches deployer');
-                } catch (sigError) {
-                    return res.status(403).json({
-                        success: false,
-                        message: 'Invalid signature format'
-                    });
-                }
+                // Wallet doesn't match deployer - REJECT immediately
+                // User must use the wallet that deployed the contract
+                return res.status(403).json({
+                    success: false,
+                    message: `Contract ownership verification failed. Please use the wallet that deployed this contract (${deployer.slice(0, 6)}...${deployer.slice(-4)}). Signatures from other wallets are not accepted.`
+                });
             } else {
-                console.log('✅ Wallet matches contract deployer');
+                console.log('✅ Wallet matches contract deployer - no signature needed');
             }
         } else {
-            // Deployer not found - require signature as proof
-            if (!verificationSignature) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Contract ownership verification required. Please sign the verification message first.'
-                });
-            }
-            
-            // Verify signature matches connected wallet
-            try {
-                const message = `I am the owner of contract ${mainContract}. Signing to verify ownership for BuilderHub.`;
-                const recoveredAddress = ethers.utils.verifyMessage(message, verificationSignature);
-                
-                if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
-                    return res.status(403).json({
-                        success: false,
-                        message: 'Signature verification failed. The signature does not match your connected wallet.'
-                    });
-                }
-                
-                console.log('✅ Signature verified - matches connected wallet');
-            } catch (sigError) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Invalid signature format'
-                });
-            }
+            // Deployer not found - This is a security risk, reject the submission
+            // We cannot verify ownership without knowing the deployer
+            console.log('⚠️  Contract deployer not found - rejecting for security');
+            return res.status(403).json({
+                success: false,
+                message: 'Unable to verify contract ownership. The contract deployer could not be found. Please ensure the contract exists on Base network.'
+            });
         }
 
         // Check if wallet already exists
@@ -654,7 +613,7 @@ app.post('/api/verify-contract-owner', async (req, res) => {
             success: true,
             deployerMatches,
             deployerAddress: deployer,
-            requiresSignature
+            requiresSignature: false // No longer accepting signatures from other wallets
         });
     } catch (error) {
         console.error('Verify contract owner error:', error);

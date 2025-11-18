@@ -76,15 +76,21 @@ async function verifyContractOwnership(contractAddress) {
 
         if (data.success && data.deployerMatches) {
             showContractStatus('mainContractStatus', '✓ Contract ownership verified', 'success');
+            // Hide signature section if it was shown
+            const signatureSection = document.getElementById('signatureSection');
+            if (signatureSection) signatureSection.style.display = 'none';
             return true;
         } else if (data.success && !data.deployerMatches) {
-            // Deployer doesn't match - require signature
-            showContractStatus('mainContractStatus', 'Contract deployer does not match. Signature required.', 'pending');
+            // Deployer doesn't match - show error and hide signature section
+            const deployerAddress = data.deployerAddress || 'the deployer wallet';
+            showContractStatus('mainContractStatus', `❌ Wallet mismatch. Please use the wallet that deployed this contract (${deployerAddress.slice(0, 6)}...${deployerAddress.slice(-4)}).`, 'error');
             const signatureSection = document.getElementById('signatureSection');
-            if (signatureSection) signatureSection.style.display = 'block';
+            if (signatureSection) signatureSection.style.display = 'none';
             return false;
         } else {
             showContractStatus('mainContractStatus', data.message || 'Error verifying contract. Please try again.', 'error');
+            const signatureSection = document.getElementById('signatureSection');
+            if (signatureSection) signatureSection.style.display = 'none';
             return false;
         }
     } catch (error) {
@@ -175,28 +181,15 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
         return;
     }
 
-    // Get signature if it was verified
-    let storedSignature = null;
-    const signatureStatus = document.getElementById('signatureStatus');
-    if (signatureStatus && signatureStatus.textContent.includes('verified successfully')) {
-        // Signature was verified, we need to get it from the verification
-        // For now, we'll require signature verification before submission
-        const contractAddress = document.getElementById('mainContract').value;
-        if (contractAddress) {
-            // Check if signature was stored (we'll need to store it when verified)
-            storedSignature = window.lastVerifiedSignature || null;
-        }
-    }
-
+    // No signature needed - only deployer wallet can submit
     const formData = {
         walletAddress: userAddress,
         xUsername: document.getElementById('xUsername').value.trim(),
         projectX: document.getElementById('projectX').value.trim() || null,
         githubLink: document.getElementById('githubLink').value.trim() || null,
-        mainContract: document.getElementById('mainContract').value.trim(),
-        optionalContract1: document.getElementById('optionalContract1').value.trim() || null,
-        optionalContract2: document.getElementById('optionalContract2').value.trim() || null,
-        verificationSignature: storedSignature
+        mainContract: document.getElementById('mainContract').value.trim().toLowerCase(),
+        optionalContract1: document.getElementById('optionalContract1').value.trim().toLowerCase() || null,
+        optionalContract2: document.getElementById('optionalContract2').value.trim().toLowerCase() || null
     };
 
     // Validate required fields
@@ -211,48 +204,44 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
         return;
     }
 
-    // Check if signature verification is needed
+    // Verify contract ownership before submission
     const contractAddress = formData.mainContract;
-    const needsVerification = !window.lastVerifiedSignature;
     
-    if (needsVerification) {
-        // Try to verify ownership first
-        try {
-            const verifyResponse = await fetch(`${API_BASE_URL}/verify-contract-owner`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contractAddress: contractAddress,
-                    walletAddress: userAddress
-                })
-            });
+    try {
+        const verifyResponse = await fetch(`${API_BASE_URL}/verify-contract-owner`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contractAddress: contractAddress,
+                walletAddress: userAddress
+            })
+        });
 
-            if (verifyResponse.ok) {
-                const verifyData = await verifyResponse.json();
-                
-                if (verifyData.success && !verifyData.deployerMatches) {
-                    // Deployer doesn't match - require signature
-                    alert('Contract ownership verification required. Please sign the verification message first.');
-                    document.getElementById('signatureSection').style.display = 'block';
-                    return;
-                } else if (verifyData.success && verifyData.deployerMatches) {
-                    // Deployer matches - no signature needed
-                    console.log('✅ Wallet matches deployer, no signature needed');
-                    window.lastVerifiedSignature = null; // Clear any old signature
-                } else {
-                    // Deployer not found - require signature
-                    alert('Contract ownership verification required. Please sign the verification message first.');
-                    document.getElementById('signatureSection').style.display = 'block';
-                    return;
-                }
+        if (verifyResponse.ok) {
+            const verifyData = await verifyResponse.json();
+            
+            if (verifyData.success && !verifyData.deployerMatches) {
+                // Deployer doesn't match - reject submission
+                const deployerAddress = verifyData.deployerAddress || 'the deployer wallet';
+                alert(`Contract ownership verification failed. Please use the wallet that deployed this contract (${deployerAddress.slice(0, 6)}...${deployerAddress.slice(-4)}).`);
+                return;
+            } else if (verifyData.success && verifyData.deployerMatches) {
+                // Deployer matches - proceed with submission
+                console.log('✅ Wallet matches deployer, proceeding with submission');
+            } else {
+                // Deployer not found or other error
+                alert(verifyData.message || 'Unable to verify contract ownership. Please ensure the contract exists on Base network.');
+                return;
             }
-        } catch (verifyError) {
-            console.error('Verification check error:', verifyError);
-            // If verification check fails, require signature as safety measure
-            alert('Contract ownership verification required. Please sign the verification message first.');
-            document.getElementById('signatureSection').style.display = 'block';
+        } else {
+            const errorData = await verifyResponse.json().catch(() => ({ message: 'Unknown error' }));
+            alert(errorData.message || 'Error verifying contract ownership. Please try again.');
             return;
         }
+    } catch (verifyError) {
+        console.error('Verification check error:', verifyError);
+        alert('Error verifying contract ownership. Please try again.');
+        return;
     }
 
     // Validate X username format
