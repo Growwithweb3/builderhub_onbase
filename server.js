@@ -414,15 +414,13 @@ app.post('/api/register', checkDatabase, async (req, res) => {
             githubLink,
             mainContract,
             optionalContract1,
-            optionalContract2,
-            verificationSignature
+            optionalContract2
         } = req.body;
 
         console.log('📝 Registration request received:', {
             walletAddress,
             xUsername,
-            mainContract,
-            hasSignature: !!verificationSignature
+            mainContract
         });
 
         // Validation
@@ -527,13 +525,12 @@ app.post('/api/register', checkDatabase, async (req, res) => {
                     main_contract = $4,
                     optional_contract_1 = $5,
                     optional_contract_2 = $6,
-                    verification_signature = $7,
                     is_approved = FALSE,
                     is_rejected = FALSE,
                     rejection_reason = NULL,
                     date_submitted = CURRENT_TIMESTAMP,
                     last_updated = CURRENT_TIMESTAMP
-                WHERE wallet_address = $8
+                WHERE wallet_address = $7
                 RETURNING *`,
                 [
                     formattedXUsername,
@@ -542,7 +539,6 @@ app.post('/api/register', checkDatabase, async (req, res) => {
                     mainContract.toLowerCase(),
                     cleanOptional1,
                     cleanOptional2,
-                    verificationSignature || null,
                     walletAddress.toLowerCase()
                 ]
             );
@@ -555,16 +551,15 @@ app.post('/api/register', checkDatabase, async (req, res) => {
                 xUsername: formattedXUsername,
                 mainContract: mainContract.toLowerCase(),
                 projectX: cleanProjectX,
-                githubLink: cleanGithubLink,
-                hasSignature: !!verificationSignature
+                githubLink: cleanGithubLink
             });
 
             result = await pool.query(
                 `INSERT INTO developers (
                     wallet_address, x_username, project_x, github_link,
                     main_contract, optional_contract_1, optional_contract_2,
-                    verification_signature, is_approved, is_rejected
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                    is_approved, is_rejected
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 RETURNING *`,
                 [
                     walletAddress.toLowerCase(),
@@ -574,7 +569,6 @@ app.post('/api/register', checkDatabase, async (req, res) => {
                     mainContract.toLowerCase(),
                     cleanOptional1,
                     cleanOptional2,
-                    verificationSignature || null,
                     false,
                     false
                 ]
@@ -686,143 +680,6 @@ app.post('/api/verify-contract-owner', async (req, res) => {
     }
 });
 
-/**
- * Verify signature - STRICT VERIFICATION
- * POST /api/verify-signature
- * Only accepts signatures from the contract deployer wallet
- */
-app.post('/api/verify-signature', async (req, res) => {
-    try {
-        const { contractAddress, walletAddress, message, signature } = req.body;
-
-        console.log('🔐 VERIFY SIGNATURE REQUEST:', { 
-            contractAddress, 
-            walletAddress, 
-            hasMessage: !!message, 
-            hasSignature: !!signature 
-        });
-
-        if (!contractAddress || !walletAddress || !message || !signature) {
-            return res.status(400).json({
-                success: false,
-                verified: false,
-                message: 'Missing required fields'
-            });
-        }
-
-        // Validate address formats
-        if (!contractAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
-            return res.status(400).json({
-                success: false,
-                verified: false,
-                message: 'Invalid contract address format'
-            });
-        }
-
-        if (!walletAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
-            return res.status(400).json({
-                success: false,
-                verified: false,
-                message: 'Invalid wallet address format'
-            });
-        }
-
-        // Recover address from signature
-        let recoveredAddress;
-        try {
-            recoveredAddress = ethers.utils.verifyMessage(message, signature);
-            console.log('✅ Signature recovered. Signer:', recoveredAddress.toLowerCase());
-        } catch (sigError) {
-            console.error('❌ Error recovering address from signature:', sigError.message);
-            return res.status(400).json({
-                success: false,
-                verified: false,
-                message: 'Invalid signature format'
-            });
-        }
-
-        // Get contract deployer
-        console.log('🔍 Fetching contract deployer...');
-        const deployer = await getContractDeployer(contractAddress);
-
-        if (!deployer) {
-            console.log('⚠️  Deployer not found - cannot verify');
-            return res.status(400).json({
-                success: false,
-                verified: false,
-                message: 'Unable to verify contract ownership. Could not find contract deployer.'
-            });
-        }
-
-        console.log('📊 Comparison:');
-        console.log('   Contract Deployer:', deployer.toLowerCase());
-        console.log('   Signature Signer: ', recoveredAddress.toLowerCase());
-        console.log('   Connected Wallet: ', walletAddress.toLowerCase());
-
-        // STRICT VERIFICATION: Signature must be from the contract deployer
-        // Do NOT accept signatures from any other wallet
-        const signerMatchesDeployer = recoveredAddress.toLowerCase() === deployer.toLowerCase();
-        
-        if (!signerMatchesDeployer) {
-            // Signature is from wrong wallet - REJECT
-            console.log('❌ SIGNATURE SIGNER MISMATCH - Rejecting');
-            console.log('   Expected signer (deployer):', deployer.slice(0, 6) + '...' + deployer.slice(-4));
-            console.log('   Signature signer:', recoveredAddress.slice(0, 6) + '...' + recoveredAddress.slice(-4));
-            
-            return res.status(403).json({
-                success: false,
-                verified: false,
-                message: `❌ Signature verification failed! The signer of this message (${recoveredAddress.slice(0, 6)}...${recoveredAddress.slice(-4)}) does not match the contract deployer (${deployer.slice(0, 6)}...${deployer.slice(-4)}). You must sign with the wallet that deployed the contract.`
-            });
-        }
-
-        // Also verify that connected wallet matches the signer
-        const walletMatchesSigner = walletAddress.toLowerCase() === recoveredAddress.toLowerCase();
-        
-        if (!walletMatchesSigner) {
-            console.log('❌ CONNECTED WALLET MISMATCH - Wallet that signed is different from connected wallet');
-            return res.status(403).json({
-                success: false,
-                verified: false,
-                message: 'The wallet that signed the message does not match your connected MetaMask wallet. Please make sure you are signing with the correct wallet.'
-            });
-        }
-
-        // All checks passed - signature is valid
-        console.log('✅ SIGNATURE VERIFICATION PASSED');
-        console.log('   Signer is the contract deployer');
-        console.log('   Connected wallet matches signer');
-
-        if (pool) {
-            try {
-                // Update developer record with signature
-                await pool.query(
-                    'UPDATE developers SET verification_signature = $1 WHERE wallet_address = $2',
-                    [signature, walletAddress.toLowerCase()]
-                );
-                console.log('💾 Signature saved to database');
-            } catch (dbError) {
-                console.error('⚠️  Database update error (non-critical):', dbError.message);
-                // Continue anyway - DB error doesn't invalidate the signature
-            }
-        }
-
-        res.json({
-            success: true,
-            verified: true,
-            message: '✅ Signature verified successfully! You can now submit your profile.'
-        });
-
-    } catch (error) {
-        console.error('❌ Verify signature error:', error);
-        res.status(500).json({
-            success: false,
-            verified: false,
-            message: 'Error verifying signature',
-            error: error.message
-        });
-    }
-});
 
 /**
  * Check user status

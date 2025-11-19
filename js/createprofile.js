@@ -119,23 +119,16 @@ async function verifyContractOwnership(contractAddress) {
         // Check if verification was successful
         if (data.success && data.deployerMatches) {
             showContractStatus('mainContractStatus', '✓ Contract ownership verified', 'success');
-            // Hide signature section if it was shown
-            const signatureSection = document.getElementById('signatureSection');
-            if (signatureSection) signatureSection.style.display = 'none';
             return true;
         } else if (data.success && data.requiresManualReview) {
             // Deployer not found - allow for manual review
             showContractStatus('mainContractStatus', '⚠️ Deployer not found automatically. Submission will be reviewed manually by admin.', 'pending');
-            const signatureSection = document.getElementById('signatureSection');
-            if (signatureSection) signatureSection.style.display = 'none';
             return true; // Allow submission for manual review
         } else {
             // Verification failed - show error
             const deployerAddress = data.deployerAddress || 'the deployer wallet';
             const errorMessage = data.message || `❌ Wallet mismatch. Please use the wallet that deployed this contract (${deployerAddress.slice(0, 6)}...${deployerAddress.slice(-4)}).`;
             showContractStatus('mainContractStatus', errorMessage, 'error');
-            const signatureSection = document.getElementById('signatureSection');
-            if (signatureSection) signatureSection.style.display = 'none';
             return false;
         }
     } catch (error) {
@@ -153,11 +146,6 @@ async function verifyContractOwnership(contractAddress) {
     }
 }
 
-// Sign verification message - DISABLED: Only deployer wallet can submit
-async function signVerificationMessage(contractAddress) {
-    alert('⚠️ Signature verification is disabled. Only the wallet that deployed the contract can submit. Please use the deployer wallet.');
-    return false;
-}
 
 function showContractStatus(elementId, message, type) {
     const element = document.getElementById(elementId);
@@ -170,12 +158,6 @@ function showContractStatus(elementId, message, type) {
 // ============================================
 // Form Submission
 // ============================================
-document.getElementById('signMessageBtn')?.addEventListener('click', async () => {
-    const contractAddress = document.getElementById('mainContract').value;
-    if (contractAddress) {
-        await signVerificationMessage(contractAddress);
-    }
-});
 
 document.getElementById('profileForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
