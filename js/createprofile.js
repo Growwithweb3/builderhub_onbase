@@ -147,59 +147,10 @@ async function verifyContractOwnership(contractAddress) {
     }
 }
 
-// Sign verification message
+// Sign verification message - DISABLED: Only deployer wallet can submit
 async function signVerificationMessage(contractAddress) {
-    if (!userAddress || !signer) {
-        alert('Please connect your wallet first');
-        return false;
-    }
-
-    try {
-        const message = `I am the owner of contract ${contractAddress}. Signing to verify ownership for BuilderHub.`;
-        
-        // Sign message
-        const signature = await signer.signMessage(message);
-
-        // Verify signature with backend
-        const response = await fetch(`${API_BASE_URL}/verify-signature`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                contractAddress: contractAddress,
-                walletAddress: userAddress,
-                message: message,
-                signature: signature
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-            console.error('API Error:', errorData);
-            showContractStatus('signatureStatus', errorData.message || 'Signature verification failed', 'error');
-            return false;
-        }
-
-        const data = await response.json();
-
-        if (data.success && data.verified) {
-            showContractStatus('signatureStatus', '✓ Signature verified successfully', 'success');
-            // Store signature for form submission
-            window.lastVerifiedSignature = signature;
-            const submitBtn = document.getElementById('submitProfileBtn');
-            if (submitBtn) submitBtn.disabled = false;
-            return true;
-        } else {
-            showContractStatus('signatureStatus', data.message || 'Signature verification failed', 'error');
-            window.lastVerifiedSignature = null;
-            return false;
-        }
-    } catch (error) {
-        console.error('Error signing message:', error);
-        showContractStatus('signatureStatus', 'Error signing message. Please try again.', 'error');
-        return false;
-    }
+    alert('⚠️ Signature verification is disabled. Only the wallet that deployed the contract can submit. Please use the deployer wallet.');
+    return false;
 }
 
 function showContractStatus(elementId, message, type) {
