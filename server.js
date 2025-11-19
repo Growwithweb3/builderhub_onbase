@@ -847,13 +847,7 @@ app.get('/api/leaderboard', checkDatabase, async (req, res) => {
         const sortBy = req.query.sort || 'transactions';
         const limit = 100;
 
-        let orderBy;
-        if (sortBy === 'wallets') {
-            orderBy = 'rank_unique ASC, unique_wallets DESC';
-        } else {
-            orderBy = 'rank_tx ASC, total_transactions DESC';
-        }
-
+        // Get all approved developers with stats
         const result = await pool.query(`
             SELECT 
                 d.wallet_address,
@@ -866,17 +860,67 @@ app.get('/api/leaderboard', checkDatabase, async (req, res) => {
             FROM developers d
             LEFT JOIN project_stats s ON d.wallet_address = s.wallet_address
             WHERE d.is_approved = TRUE
-            ORDER BY ${orderBy}
-            LIMIT $1
-        `, [limit]);
+        `);
 
-        const leaderboard = result.rows.map((row, index) => ({
-            walletAddress: row.wallet_address,
-            projectName: row.x_username.replace('@', ''),
-            contractAddress: row.contract_address,
-            totalTransactions: parseInt(row.total_transactions) || 0,
-            uniqueWallets: parseInt(row.unique_wallets) || 0,
-            xUsername: row.x_username
+        // Calculate weighted score for each project
+        // Formula: Score = (TX_COUNT × 1) + (UNIQUE_WALLETS × 5)
+        const projects = result.rows.map(row => {
+            const txCount = parseInt(row.total_transactions) || 0;
+            const uniqueWallets = parseInt(row.unique_wallets) || 0;
+            const weightedScore = (txCount * 1) + (uniqueWallets * 5);
+            
+            return {
+                walletAddress: row.wallet_address,
+                projectName: row.x_username.replace('@', ''),
+                contractAddress: row.contract_address,
+                totalTransactions: txCount,
+                uniqueWallets: uniqueWallets,
+                xUsername: row.x_username,
+                weightedScore: weightedScore,
+                rankTx: parseInt(row.rank_tx) || 999,
+                rankUnique: parseInt(row.rank_unique) || 999
+            };
+        });
+
+        // Sort by weighted score (descending) for overall ranking
+        projects.sort((a, b) => b.weightedScore - a.weightedScore);
+
+        // Assign overall rank based on weighted score
+        projects.forEach((project, index) => {
+            project.rank = index + 1;
+        });
+
+        // If sortBy is 'wallets', re-sort by unique wallets
+        // If sortBy is 'transactions', re-sort by transactions
+        // But still show the weighted rank
+        let sortedProjects;
+        if (sortBy === 'wallets') {
+            sortedProjects = [...projects].sort((a, b) => {
+                if (b.uniqueWallets !== a.uniqueWallets) {
+                    return b.uniqueWallets - a.uniqueWallets;
+                }
+                return b.totalTransactions - a.totalTransactions;
+            });
+        } else {
+            sortedProjects = [...projects].sort((a, b) => {
+                if (b.totalTransactions !== a.totalTransactions) {
+                    return b.totalTransactions - a.totalTransactions;
+                }
+                return b.uniqueWallets - a.uniqueWallets;
+            });
+        }
+
+        // Limit results
+        const leaderboard = sortedProjects.slice(0, limit).map(project => ({
+            walletAddress: project.walletAddress,
+            projectName: project.projectName,
+            contractAddress: project.contractAddress,
+            totalTransactions: project.totalTransactions,
+            uniqueWallets: project.uniqueWallets,
+            xUsername: project.xUsername,
+            rank: project.rank, // Overall rank based on weighted score
+            rankTx: project.rankTx,
+            rankUnique: project.rankUnique
         }));
 
         res.json({

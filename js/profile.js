@@ -68,21 +68,36 @@ const API_BASE_URL = window.API_BASE_URL || 'https://builderhubonbase-production
 // Load Profile Data
 // ============================================
 async function loadProfileData() {
-    if (!userAddress) return;
-
-    try {
-        // Check if user is approved
-        const statusResponse = await fetch(`${API_BASE_URL}/check-status/${userAddress}`);
-        const statusData = await statusResponse.status === 200 ? await statusResponse.json() : null;
-
-        if (!statusData || !statusData.approved) {
-            alert('Your profile is not approved yet. Please wait for admin review.');
+    // Check if wallet address is provided in URL query parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const walletParam = urlParams.get('wallet');
+    
+    // Use wallet from URL parameter if provided, otherwise use connected wallet
+    const targetWallet = walletParam || userAddress;
+    
+    if (!targetWallet) {
+        if (!userAddress) {
+            alert('Please connect your wallet or provide a wallet address in the URL.');
             window.location.href = 'index.html';
             return;
         }
+    }
+
+    try {
+        // Check if user is approved (only if viewing own profile)
+        if (!walletParam && userAddress) {
+            const statusResponse = await fetch(`${API_BASE_URL}/check-status/${userAddress}`);
+            const statusData = statusResponse.status === 200 ? await statusResponse.json() : null;
+
+            if (!statusData || !statusData.approved) {
+                alert('Your profile is not approved yet. Please wait for admin review.');
+                window.location.href = 'index.html';
+                return;
+            }
+        }
 
         // Load profile data
-        const profileResponse = await fetch(`${API_BASE_URL}/profile/${userAddress}`);
+        const profileResponse = await fetch(`${API_BASE_URL}/profile/${targetWallet}`);
         const profileData = await profileResponse.json();
 
         if (profileData.success) {
@@ -98,34 +113,6 @@ async function loadProfileData() {
 }
 
 function displayProfileInfo(profile) {
-    // Display developer name (X username)
-    const developerName = document.getElementById('developerName');
-    if (developerName) {
-        developerName.textContent = profile.xUsername || 'Developer';
-    }
-
-    // Display social links
-    const xLink = document.getElementById('xLink');
-    if (xLink && profile.xUsername) {
-        const xUsername = profile.xUsername.startsWith('@') ? profile.xUsername.slice(1) : profile.xUsername;
-        xLink.href = `https://twitter.com/${xUsername}`;
-        xLink.textContent = `@${xUsername}`;
-    }
-
-    const githubLink = document.getElementById('githubLink');
-    if (githubLink && profile.githubLink) {
-        githubLink.href = profile.githubLink;
-        githubLink.textContent = 'GitHub';
-    } else if (githubLink) {
-        githubLink.style.display = 'none';
-    }
-
-    // Display contract address
-    const mainContractAddress = document.getElementById('mainContractAddress');
-    if (mainContractAddress && profile.mainContract) {
-        mainContractAddress.textContent = profile.mainContract;
-    }
-
     // Display additional contracts
     if (profile.optionalContract1 || profile.optionalContract2) {
         const additionalSection = document.getElementById('additionalContractsSection');
@@ -149,10 +136,15 @@ function displayProfileInfo(profile) {
 // Load Stats
 // ============================================
 async function loadStats() {
-    if (!userAddress) return;
+    // Get wallet from URL parameter or use connected wallet
+    const urlParams = new URLSearchParams(window.location.search);
+    const walletParam = urlParams.get('wallet');
+    const targetWallet = walletParam || userAddress;
+    
+    if (!targetWallet) return;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/stats/${userAddress}`);
+        const response = await fetch(`${API_BASE_URL}/stats/${targetWallet}`);
         const data = await response.json();
 
         if (data.success) {

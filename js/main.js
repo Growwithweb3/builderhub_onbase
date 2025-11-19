@@ -34,8 +34,8 @@ async function connectWallet() {
         // Update UI
         updateWalletUI();
         
-        // Check if user is approved and redirect
-        checkUserStatus();
+        // Check user status (with redirect for new connections)
+        checkUserStatus(true);
         
     } catch (error) {
         console.error('Error connecting wallet:', error);
@@ -98,8 +98,11 @@ function hideWalletInfo() {
 // API Base URL
 const API_BASE_URL = window.API_BASE_URL || 'https://builderhubonbase-production.up.railway.app/api';
 
-// Check user status and redirect
-async function checkUserStatus() {
+// Check user status (without auto-redirect)
+let userApproved = false;
+let userExists = false;
+
+async function checkUserStatus(shouldRedirect = true) {
     if (!userAddress) return;
 
     try {
@@ -107,20 +110,45 @@ async function checkUserStatus() {
         const response = await fetch(`${API_BASE_URL}/check-status/${userAddress}`);
         const data = await response.json();
 
-        if (data.approved) {
-            // Redirect to profile page
-            window.location.href = 'profile.html';
-        } else if (data.exists) {
-            // User exists but not approved - show waiting message
-            alert('Your profile is pending approval. Please wait for admin review.');
-        } else {
-            // New user - redirect to create profile
-            window.location.href = 'createprofile.html';
+        userApproved = data.approved || false;
+        userExists = data.exists || false;
+
+        // Update UI based on status
+        updateProfileButton();
+
+        // Only redirect if shouldRedirect is true (not when clicking Leaderboard)
+        if (shouldRedirect) {
+            if (userApproved) {
+                // Redirect to profile page only if not already on index page
+                if (!window.location.pathname.includes('index.html')) {
+                    window.location.href = 'profile.html';
+                }
+            } else if (userExists) {
+                // User exists but not approved - show waiting message
+                alert('Your profile is pending approval. Please wait for admin review.');
+            } else {
+                // New user - redirect to create profile
+                window.location.href = 'createprofile.html';
+            }
         }
     } catch (error) {
         console.error('Error checking user status:', error);
-        // If API fails, redirect to create profile
-        window.location.href = 'createprofile.html';
+        // If API fails and shouldRedirect, redirect to create profile
+        if (shouldRedirect) {
+            window.location.href = 'createprofile.html';
+        }
+    }
+}
+
+// Update "My Profile" button visibility
+function updateProfileButton() {
+    const myProfileBtn = document.getElementById('myProfileBtn');
+    if (myProfileBtn) {
+        if (userApproved) {
+            myProfileBtn.style.display = 'inline-block';
+        } else {
+            myProfileBtn.style.display = 'none';
+        }
     }
 }
 
@@ -132,7 +160,9 @@ if (typeof window.ethereum !== 'undefined') {
         } else {
             userAddress = accounts[0];
             updateWalletUI();
-            checkUserStatus();
+            // Don't auto-redirect when account changes on index page
+            const isOnIndexPage = window.location.pathname.includes('index.html') || window.location.pathname === '/';
+            checkUserStatus(!isOnIndexPage);
         }
     });
 }
@@ -153,7 +183,9 @@ async function checkExistingConnection() {
             provider = new ethers.providers.Web3Provider(window.ethereum);
             signer = provider.getSigner();
             updateWalletUI();
-            checkUserStatus();
+            // Don't auto-redirect on page load if user is on index page
+            const isOnIndexPage = window.location.pathname.includes('index.html') || window.location.pathname === '/';
+            checkUserStatus(!isOnIndexPage);
         }
     } catch (error) {
         console.error('Error checking existing connection:', error);
@@ -223,16 +255,22 @@ function displayLeaderboard(data) {
         return;
     }
 
-    tableBody.innerHTML = data.map((project, index) => `
-        <tr>
-            <td class="rank">#${index + 1}</td>
+    tableBody.innerHTML = data.map((project, index) => {
+        // Use weighted rank if available, otherwise use index + 1
+        const displayRank = project.rank || (index + 1);
+        const xUsername = project.xUsername ? (project.xUsername.startsWith('@') ? project.xUsername.slice(1) : project.xUsername) : '';
+        
+        return `
+        <tr style="cursor: pointer;" onclick="window.location.href='profile.html?wallet=${project.walletAddress}'">
+            <td class="rank">#${displayRank}</td>
             <td>${project.projectName || 'Unnamed Project'}</td>
             <td class="contract-address">${project.contractAddress}</td>
             <td>${formatNumber(project.totalTransactions || 0)}</td>
             <td>${formatNumber(project.uniqueWallets || 0)}</td>
-            <td><a href="https://twitter.com/${project.xUsername}" target="_blank">@${project.xUsername}</a></td>
+            <td><a href="https://twitter.com/${xUsername}" target="_blank" onclick="event.stopPropagation();">@${xUsername || 'N/A'}</a></td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // Tab switching
