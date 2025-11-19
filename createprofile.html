@@ -48,7 +48,7 @@
 
                     <!-- GitHub Link (Optional) -->
                     <div class="form-group">
-                        <label for="githubLink">GitHub Link (Optional)</label>
+                        <label for="githubLink">GitHub Link (Optional but recommended)</label>
                         <input type="url" id="githubLink" name="githubLink" placeholder="https://github.com/username">
                         <small>Your GitHub profile or repository link</small>
                     </div>
@@ -58,6 +58,7 @@
                         <label for="mainContract">Main Contract Address <span class="required">*</span></label>
                         <input type="text" id="mainContract" name="mainContract" placeholder="0x..." required pattern="^0x[a-fA-F0-9]{40}$">
                         <small>Your main smart contract address on Base</small>
+                        <div id="mainContractStatus" class="contract-status"></div>
                     </div>
 
                     <!-- Optional Contract Address 1 -->
@@ -74,6 +75,12 @@
                         <small>Additional contract address (optional)</small>
                     </div>
 
+                    <!-- Project Description -->
+                    <div class="form-group">
+                        <label for="projectDescription">Explain About Your Project <span class="required">*</span></label>
+                        <textarea id="projectDescription" name="projectDescription" rows="6" placeholder="Briefly describe your project, its features, and what makes it unique..." required></textarea>
+                        <small>Provide a clear and concise description of your project (minimum 50 characters)</small>
+                    </div>
 
                     <!-- Submit Button -->
                     <div class="form-actions">

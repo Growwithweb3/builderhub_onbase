@@ -80,6 +80,7 @@ async function initializeDatabase() {
                 main_contract VARCHAR(42) NOT NULL,
                 optional_contract_1 VARCHAR(42),
                 optional_contract_2 VARCHAR(42),
+                project_description TEXT,
                 verification_signature TEXT,
                 is_approved BOOLEAN DEFAULT FALSE,
                 is_rejected BOOLEAN DEFAULT FALSE,
@@ -87,6 +88,12 @@ async function initializeDatabase() {
                 date_submitted TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
+        `);
+
+        // Add project_description column if it doesn't exist (for existing databases)
+        await pool.query(`
+            ALTER TABLE developers 
+            ADD COLUMN IF NOT EXISTS project_description TEXT
         `);
 
         // Create project_stats table
@@ -414,20 +421,30 @@ app.post('/api/register', checkDatabase, async (req, res) => {
             githubLink,
             mainContract,
             optionalContract1,
-            optionalContract2
+            optionalContract2,
+            projectDescription
         } = req.body;
 
         console.log('📝 Registration request received:', {
             walletAddress,
             xUsername,
-            mainContract
+            mainContract,
+            hasDescription: !!projectDescription
         });
 
         // Validation
-        if (!walletAddress || !xUsername || !mainContract) {
+        if (!walletAddress || !xUsername || !mainContract || !projectDescription) {
             return res.status(400).json({
                 success: false,
-                message: 'Missing required fields: walletAddress, xUsername, mainContract'
+                message: 'Missing required fields: walletAddress, xUsername, mainContract, projectDescription'
+            });
+        }
+
+        // Validate project description length
+        if (projectDescription.trim().length < 50) {
+            return res.status(400).json({
+                success: false,
+                message: 'Project description must be at least 50 characters long'
             });
         }
 
@@ -490,6 +507,7 @@ app.post('/api/register', checkDatabase, async (req, res) => {
         const cleanGithubLink = githubLink && githubLink.trim() ? githubLink.trim() : null;
         const cleanOptional1 = optionalContract1 && optionalContract1.trim() ? optionalContract1.trim().toLowerCase() : null;
         const cleanOptional2 = optionalContract2 && optionalContract2.trim() ? optionalContract2.trim().toLowerCase() : null;
+        const cleanProjectDescription = projectDescription && projectDescription.trim() ? projectDescription.trim() : null;
 
         let result;
         let isResubmission = false;
@@ -525,12 +543,13 @@ app.post('/api/register', checkDatabase, async (req, res) => {
                     main_contract = $4,
                     optional_contract_1 = $5,
                     optional_contract_2 = $6,
+                    project_description = $7,
                     is_approved = FALSE,
                     is_rejected = FALSE,
                     rejection_reason = NULL,
                     date_submitted = CURRENT_TIMESTAMP,
                     last_updated = CURRENT_TIMESTAMP
-                WHERE wallet_address = $7
+                WHERE wallet_address = $8
                 RETURNING *`,
                 [
                     formattedXUsername,
@@ -539,6 +558,7 @@ app.post('/api/register', checkDatabase, async (req, res) => {
                     mainContract.toLowerCase(),
                     cleanOptional1,
                     cleanOptional2,
+                    cleanProjectDescription,
                     walletAddress.toLowerCase()
                 ]
             );
@@ -551,15 +571,16 @@ app.post('/api/register', checkDatabase, async (req, res) => {
                 xUsername: formattedXUsername,
                 mainContract: mainContract.toLowerCase(),
                 projectX: cleanProjectX,
-                githubLink: cleanGithubLink
+                githubLink: cleanGithubLink,
+                hasDescription: !!cleanProjectDescription
             });
 
             result = await pool.query(
                 `INSERT INTO developers (
                     wallet_address, x_username, project_x, github_link,
                     main_contract, optional_contract_1, optional_contract_2,
-                    is_approved, is_rejected
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    project_description, is_approved, is_rejected
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING *`,
                 [
                     walletAddress.toLowerCase(),
@@ -569,6 +590,7 @@ app.post('/api/register', checkDatabase, async (req, res) => {
                     mainContract.toLowerCase(),
                     cleanOptional1,
                     cleanOptional2,
+                    cleanProjectDescription,
                     false,
                     false
                 ]
@@ -930,6 +952,7 @@ app.get('/api/pending-submissions', checkDatabase, async (req, res) => {
                 mainContract: row.main_contract,
                 optionalContract1: row.optional_contract_1,
                 optionalContract2: row.optional_contract_2,
+                projectDescription: row.project_description,
                 isApproved: row.is_approved,
                 isRejected: row.is_rejected,
                 dateSubmitted: row.date_submitted
@@ -1004,6 +1027,7 @@ app.get('/api/submission/:id', checkDatabase, async (req, res) => {
                 mainContract: submission.main_contract,
                 optionalContract1: submission.optional_contract_1,
                 optionalContract2: submission.optional_contract_2,
+                projectDescription: submission.project_description,
                 isApproved: submission.is_approved,
                 isRejected: submission.is_rejected,
                 dateSubmitted: submission.date_submitted

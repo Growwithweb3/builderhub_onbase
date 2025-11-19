@@ -167,6 +167,13 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
         return;
     }
 
+    // Get submit button reference early
+    const submitBtn = document.getElementById('submitProfileBtn');
+    if (!submitBtn) {
+        console.error('Submit button not found');
+        return;
+    }
+
     // No signature needed - only deployer wallet can submit
     const formData = {
         walletAddress: userAddress,
@@ -175,12 +182,19 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
         githubLink: document.getElementById('githubLink').value.trim() || null,
         mainContract: document.getElementById('mainContract').value.trim().toLowerCase(),
         optionalContract1: document.getElementById('optionalContract1').value.trim().toLowerCase() || null,
-        optionalContract2: document.getElementById('optionalContract2').value.trim().toLowerCase() || null
+        optionalContract2: document.getElementById('optionalContract2').value.trim().toLowerCase() || null,
+        projectDescription: document.getElementById('projectDescription').value.trim()
     };
 
     // Validate required fields
-    if (!formData.xUsername || !formData.mainContract) {
-        alert('Please fill in all required fields');
+    if (!formData.xUsername || !formData.mainContract || !formData.projectDescription) {
+        alert('Please fill in all required fields (X Username, Main Contract Address, and Project Description)');
+        return;
+    }
+
+    // Validate project description length
+    if (formData.projectDescription.length < 50) {
+        alert('Project description must be at least 50 characters long. Please provide more details about your project.');
         return;
     }
 
@@ -233,6 +247,8 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
     } catch (verifyError) {
         console.error('Verification check error:', verifyError);
         alert('Error verifying contract ownership. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Profile';
         return;
     }
 
@@ -242,7 +258,6 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
     }
 
     try {
-        const submitBtn = document.getElementById('submitProfileBtn');
         submitBtn.disabled = true;
         submitBtn.textContent = 'Submitting...';
 

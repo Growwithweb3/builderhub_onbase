@@ -320,6 +320,12 @@ async function showSubmissionDetails(submissionId) {
                     </div>
                     ` : ''}
                     <div class="detail-row">
+                        <strong>Project Description:</strong>
+                        <div style="margin-top: 0.5rem; padding: 1rem; background: #f5f5f5; border-radius: 8px; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">
+                            ${sub.projectDescription || 'N/A'}
+                        </div>
+                    </div>
+                    <div class="detail-row">
                         <strong>Status:</strong>
                         <span class="submission-status ${sub.isApproved ? 'approved' : sub.isRejected ? 'rejected' : 'pending'}">
                             ${sub.isApproved ? 'Approved' : sub.isRejected ? 'Rejected' : 'Pending'}
