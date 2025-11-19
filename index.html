@@ -22,7 +22,7 @@
                 <li><a href="#workflow" class="nav-link">How It Works</a></li>
             </ul>
             <div class="wallet-section">
-                <a href="createprofile.html" id="resubmitFormBtn" class="btn btn-secondary btn-sm" style="display: none; margin-right: 0.5rem;">Resubmit Form</a>
+                <a href="createprofile.html" id="resubmitFormBtn" class="btn btn-secondary btn-sm" style="display: none;">Resubmit Form</a>
                 <button id="connectWalletBtn" class="btn btn-primary">Connect MetaMask Wallet</button>
                 <div id="walletInfo" class="wallet-info" style="display: none;">
                     <span id="walletAddress"></span>
@@ -208,6 +208,32 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    
+    <!-- Suppress Solana extension errors -->
+    <script>
+        // Global error handler to suppress Solana extension errors
+        window.addEventListener('error', function(event) {
+            // Ignore errors from Solana extensions
+            if (event.filename && event.filename.includes('solana')) {
+                event.preventDefault();
+                return false;
+            }
+        }, true);
+
+        // Suppress unhandled promise rejections from extensions
+        window.addEventListener('unhandledrejection', function(event) {
+            if (event.reason && (
+                event.reason.message?.includes('solana') || 
+                event.reason.stack?.includes('solana') ||
+                event.reason.toString().includes('solana') ||
+                event.reason.toString().includes('solanaActionsContentScript')
+            )) {
+                event.preventDefault();
+                return false;
+            }
+        });
+    </script>
+    
     <script src="js/main.js"></script>
 </body>
 </html>

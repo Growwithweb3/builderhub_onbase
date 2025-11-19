@@ -69,13 +69,19 @@ function updateWalletUI() {
         if (connectBtn) connectBtn.style.display = 'none';
         if (connectHeroBtn) connectHeroBtn.style.display = 'none';
         if (connectCtaBtn) connectCtaBtn.style.display = 'none';
-        if (resubmitFormBtn) resubmitFormBtn.style.display = 'inline-block';
+        if (resubmitFormBtn) {
+            resubmitFormBtn.style.display = 'inline-block';
+            console.log('✅ Resubmit button shown');
+        }
     } else {
         if (walletInfo) walletInfo.style.display = 'none';
         if (connectBtn) connectBtn.style.display = 'block';
         if (connectHeroBtn) connectHeroBtn.style.display = 'block';
         if (connectCtaBtn) connectCtaBtn.style.display = 'block';
-        if (resubmitFormBtn) resubmitFormBtn.style.display = 'none';
+        if (resubmitFormBtn) {
+            resubmitFormBtn.style.display = 'none';
+            console.log('❌ Resubmit button hidden');
+        }
     }
 }
 
@@ -135,6 +141,29 @@ if (typeof window.ethereum !== 'undefined') {
     });
 }
 
+// Check if wallet is already connected on page load
+async function checkExistingConnection() {
+    if (typeof window.ethereum === 'undefined') {
+        return;
+    }
+
+    try {
+        const accounts = await window.ethereum.request({
+            method: 'eth_accounts'
+        });
+
+        if (accounts && accounts.length > 0) {
+            userAddress = accounts[0];
+            provider = new ethers.providers.Web3Provider(window.ethereum);
+            signer = provider.getSigner();
+            updateWalletUI();
+            checkUserStatus();
+        }
+    } catch (error) {
+        console.error('Error checking existing connection:', error);
+    }
+}
+
 // ============================================
 // Event Listeners
 // ============================================
@@ -156,6 +185,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (disconnectBtn) {
         disconnectBtn.addEventListener('click', disconnectWallet);
     }
+
+    // Check if wallet is already connected
+    checkExistingConnection();
 
     // Load leaderboard
     loadLeaderboard('transactions');

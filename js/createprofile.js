@@ -66,94 +66,8 @@ window.addEventListener('unhandledrejection', function(event) {
 // ============================================
 const API_BASE_URL = window.API_BASE_URL || 'https://builderhubonbase-production.up.railway.app/api';
 
-// ============================================
-// Contract Verification
-// ============================================
-async function verifyContractOwnership(contractAddress) {
-    if (!contractAddress || !contractAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
-        showContractStatus('mainContractStatus', 'Please enter a valid contract address', 'error');
-        return false;
-    }
-
-    // Show loading state
-    showContractStatus('mainContractStatus', 'Verifying contract...', 'pending');
-
-    try {
-        // Check if contract deployer matches connected wallet
-        const response = await fetch(`${API_BASE_URL}/verify-contract-owner`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                contractAddress: contractAddress,
-                walletAddress: userAddress
-            })
-        }).catch(fetchError => {
-            // Handle network errors
-            console.error('Network error:', fetchError);
-            throw new Error('Network error. Please check your connection and try again.');
-        });
-
-        if (!response.ok) {
-            let errorData;
-            try {
-                errorData = await response.json();
-            } catch (parseError) {
-                errorData = { message: `Server error (${response.status}). Please try again.` };
-            }
-            console.error('API Error:', errorData);
-            showContractStatus('mainContractStatus', errorData.message || 'Error verifying contract. Please try again.', 'error');
-            return false;
-        }
-
-        let data;
-        try {
-            data = await response.json();
-        } catch (parseError) {
-            console.error('JSON parse error:', parseError);
-            showContractStatus('mainContractStatus', 'Invalid response from server. Please try again.', 'error');
-            return false;
-        }
-
-        // Check if verification was successful
-        if (data.success && data.deployerMatches) {
-            showContractStatus('mainContractStatus', '✓ Contract ownership verified', 'success');
-            return true;
-        } else if (data.success && data.requiresManualReview) {
-            // Deployer not found - allow for manual review
-            showContractStatus('mainContractStatus', '⚠️ Deployer not found automatically. Submission will be reviewed manually by admin.', 'pending');
-            return true; // Allow submission for manual review
-        } else {
-            // Verification failed - show error
-            const deployerAddress = data.deployerAddress || 'the deployer wallet';
-            const errorMessage = data.message || `❌ Wallet mismatch. Please use the wallet that deployed this contract (${deployerAddress.slice(0, 6)}...${deployerAddress.slice(-4)}).`;
-            showContractStatus('mainContractStatus', errorMessage, 'error');
-            return false;
-        }
-    } catch (error) {
-        // Ignore Solana extension errors (they're not related to our code)
-        if (error.message && error.message.includes('solana')) {
-            console.warn('Solana extension error (ignored):', error.message);
-            // Continue with verification
-            return false;
-        }
-        
-        console.error('Error verifying contract:', error);
-        const errorMessage = error.message || 'Error verifying contract. Please try again.';
-        showContractStatus('mainContractStatus', errorMessage, 'error');
-        return false;
-    }
-}
-
-
-function showContractStatus(elementId, message, type) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.textContent = message;
-        element.className = `contract-status ${type}`;
-    }
-}
+// Contract verification removed - all submissions go to manual review
+// Users now confirm ownership via button click
 
 // ============================================
 // Form Submission
@@ -210,6 +124,13 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
     // Validate contract address format
     if (!formData.mainContract.match(/^0x[a-fA-F0-9]{40}$/)) {
         alert('Please enter a valid contract address');
+        return;
+    }
+
+    // Check if contract ownership is confirmed
+    const contractConfirmed = document.getElementById('contractConfirmed');
+    if (!contractConfirmed || contractConfirmed.value !== 'true') {
+        alert('Please confirm that this is your contract address by clicking the confirmation button.');
         return;
     }
 
@@ -273,6 +194,47 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
     }
 });
 
-// Auto-verification removed - all submissions go to manual review
-// Contract verification is now handled manually by admin during review
+// Contract ownership confirmation button
+document.addEventListener('DOMContentLoaded', () => {
+    const confirmBtn = document.getElementById('confirmContractBtn');
+    const contractInput = document.getElementById('mainContract');
+    const confirmationStatus = document.getElementById('confirmationStatus');
+    const contractConfirmed = document.getElementById('contractConfirmed');
+
+    if (confirmBtn && contractInput && contractConfirmed) {
+        confirmBtn.addEventListener('click', () => {
+            const contractAddress = contractInput.value.trim();
+            
+            if (!contractAddress || !contractAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
+                alert('Please enter a valid contract address first');
+                return;
+            }
+
+            // Confirm ownership
+            contractConfirmed.value = 'true';
+            confirmBtn.textContent = '✓ Confirmed - This Is My Contract';
+            confirmBtn.classList.remove('btn-secondary');
+            confirmBtn.classList.add('btn-primary');
+            confirmBtn.disabled = true;
+            
+            if (confirmationStatus) {
+                confirmationStatus.textContent = 'Contract ownership confirmed. You can now submit the form.';
+                confirmationStatus.style.color = '#10b981';
+            }
+        });
+
+        // Reset confirmation when contract address changes
+        contractInput.addEventListener('input', () => {
+            contractConfirmed.value = 'false';
+            confirmBtn.textContent = '✓ I Confirm This Is My Contract Address';
+            confirmBtn.classList.remove('btn-primary');
+            confirmBtn.classList.add('btn-secondary');
+            confirmBtn.disabled = false;
+            
+            if (confirmationStatus) {
+                confirmationStatus.textContent = '';
+            }
+        });
+    }
+});
 

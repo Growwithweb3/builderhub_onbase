@@ -59,6 +59,14 @@
                         <input type="text" id="mainContract" name="mainContract" placeholder="0x..." required pattern="^0x[a-fA-F0-9]{40}$">
                         <small>Your main smart contract address on Base</small>
                         <div id="mainContractStatus" class="contract-status"></div>
+                        <div class="contract-ownership-confirmation" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
+                            <p style="margin-bottom: 0.75rem; font-weight: 500; color: #333;">Confirm Contract Ownership:</p>
+                            <button type="button" id="confirmContractBtn" class="btn btn-secondary" style="width: 100%;">
+                                ✓ I Confirm This Is My Contract Address
+                            </button>
+                            <input type="hidden" id="contractConfirmed" value="false">
+                            <small id="confirmationStatus" style="display: block; margin-top: 0.5rem; color: #666;"></small>
+                        </div>
                     </div>
 
                     <!-- Optional Contract Address 1 -->

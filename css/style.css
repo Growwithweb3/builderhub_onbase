@@ -108,6 +108,12 @@ body {
 
 #resubmitFormBtn {
     order: -1; /* Show before connect button */
+    text-decoration: none;
+    display: inline-block;
+}
+
+#resubmitFormBtn:hover {
+    text-decoration: none;
 }
 
 .wallet-info {
