@@ -123,6 +123,12 @@ async function verifyContractOwnership(contractAddress) {
             const signatureSection = document.getElementById('signatureSection');
             if (signatureSection) signatureSection.style.display = 'none';
             return true;
+        } else if (data.success && data.requiresManualReview) {
+            // Deployer not found - allow for manual review
+            showContractStatus('mainContractStatus', '⚠️ Deployer not found automatically. Submission will be reviewed manually by admin.', 'pending');
+            const signatureSection = document.getElementById('signatureSection');
+            if (signatureSection) signatureSection.style.display = 'none';
+            return true; // Allow submission for manual review
         } else {
             // Verification failed - show error
             const deployerAddress = data.deployerAddress || 'the deployer wallet';
@@ -218,8 +224,15 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
         if (verifyResponse.ok) {
             const verifyData = await verifyResponse.json();
             
-            // STRICT CHECK: Only allow if success is true AND deployerMatches is true
-            if (!verifyData.success || !verifyData.deployerMatches) {
+            // Allow if: (success AND deployerMatches) OR (success AND requiresManualReview)
+            if (verifyData.success && (verifyData.deployerMatches || verifyData.requiresManualReview)) {
+                // Verification passed or manual review required - proceed with submission
+                if (verifyData.requiresManualReview) {
+                    console.log('⚠️ Deployer not found - allowing submission for manual review');
+                } else {
+                    console.log('✅ Wallet matches deployer, proceeding with submission');
+                }
+            } else {
                 // Verification failed - reject submission
                 const deployerAddress = verifyData.deployerAddress || 'the deployer wallet';
                 const errorMsg = verifyData.message || `Contract ownership verification failed. Please use the wallet that deployed this contract (${deployerAddress.slice(0, 6)}...${deployerAddress.slice(-4)}).`;
@@ -228,9 +241,6 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
                 submitBtn.textContent = 'Submit Profile';
                 return;
             }
-            
-            // Deployer matches - proceed with submission
-            console.log('✅ Wallet matches deployer, proceeding with submission');
         } else {
             const errorData = await verifyResponse.json().catch(() => ({ message: 'Unknown error' }));
             alert(errorData.message || 'Error verifying contract ownership. Please try again.');

@@ -166,14 +166,74 @@ async function getContractDeployer(contractAddress) {
         const normalizedAddress = contractAddress.toLowerCase();
         
         if (!BASESCAN_API_KEY) {
-            console.warn('⚠️  BASESCAN_API_KEY not configured');
+            console.warn('⚠️  BASESCAN_API_KEY not configured - API methods will fail');
         }
         
-        // Method 1: Use Basescan transaction list API - MOST RELIABLE
-        // Get the first transaction(s) to find the contract creation transaction
+        // Method 1: Try Basescan getcontractcreation API (most direct)
         if (BASESCAN_API_KEY) {
             try {
-                console.log('🔍 Method 1: Querying Basescan transaction list API...');
+                console.log('🔍 Method 1a: Trying getcontractcreation API (format 1 - contractaddresses)...');
+                const response1 = await axios.get('https://api.basescan.org/api', {
+                    params: {
+                        module: 'contract',
+                        action: 'getcontractcreation',
+                        contractaddresses: normalizedAddress,
+                        apikey: BASESCAN_API_KEY
+                    },
+                    timeout: 15000
+                });
+
+                console.log('📡 getcontractcreation API response (format 1):', {
+                    status: response1.data.status,
+                    result: response1.data.result,
+                    message: response1.data.message
+                });
+
+                if (response1.data.status === '1' && response1.data.result) {
+                    const result = Array.isArray(response1.data.result) ? response1.data.result[0] : response1.data.result;
+                    const deployer = (result.contractCreator || result.creator || result.from)?.toLowerCase();
+                    if (deployer) {
+                        console.log(`✅ Contract deployer found (getcontractcreation API): ${deployer}`);
+                        return deployer;
+                    }
+                }
+            } catch (apiError1) {
+                console.log('⚠️  getcontractcreation API (format 1) failed:', apiError1.message);
+                if (apiError1.response) {
+                    console.log('Response:', JSON.stringify(apiError1.response.data, null, 2));
+                }
+            }
+
+            // Try alternative format
+            try {
+                console.log('🔍 Method 1b: Trying getcontractcreation API (format 2 - contractaddress)...');
+                const response2 = await axios.get('https://api.basescan.org/api', {
+                    params: {
+                        module: 'contract',
+                        action: 'getcontractcreation',
+                        contractaddress: normalizedAddress,
+                        apikey: BASESCAN_API_KEY
+                    },
+                    timeout: 15000
+                });
+
+                if (response2.data.status === '1' && response2.data.result) {
+                    const result = Array.isArray(response2.data.result) ? response2.data.result[0] : response2.data.result;
+                    const deployer = (result.contractCreator || result.creator || result.from)?.toLowerCase();
+                    if (deployer) {
+                        console.log(`✅ Contract deployer found (getcontractcreation API format 2): ${deployer}`);
+                        return deployer;
+                    }
+                }
+            } catch (apiError2) {
+                console.log('⚠️  getcontractcreation API (format 2) failed:', apiError2.message);
+            }
+        }
+
+        // Method 2: Use Basescan transaction list API - Get first transaction
+        if (BASESCAN_API_KEY) {
+            try {
+                console.log('🔍 Method 2: Querying Basescan transaction list API...');
                 const txResponse = await axios.get('https://api.basescan.org/api', {
                     params: {
                         module: 'account',
@@ -182,11 +242,11 @@ async function getContractDeployer(contractAddress) {
                         startblock: 0,
                         endblock: 99999999,
                         page: 1,
-                        offset: 20, // Get first 20 transactions to find creation
+                        offset: 50, // Get first 50 transactions
                         sort: 'asc',
                         apikey: BASESCAN_API_KEY
                     },
-                    timeout: 15000
+                    timeout: 20000
                 });
 
                 console.log('📡 Transaction list API response:', {
@@ -196,14 +256,16 @@ async function getContractDeployer(contractAddress) {
                 });
 
                 if (txResponse.data.status === '1' && txResponse.data.result?.length > 0) {
-                    // Look for the creation transaction
-                    // Contract creation: 'to' is empty/null OR 'contractAddress' field exists
+                    // Look for contract creation transaction
                     for (const tx of txResponse.data.result) {
                         const txTo = (tx.to || '').toLowerCase();
                         const txFrom = (tx.from || '').toLowerCase();
                         const txContractAddress = (tx.contractAddress || '').toLowerCase();
                         
-                        // Check if this is a contract creation transaction
+                        // Contract creation indicators:
+                        // 1. 'to' is empty/null/0x
+                        // 2. 'contractAddress' matches our contract
+                        // 3. 'to' matches contract but 'from' is different
                         const isCreationTx = (!txTo || txTo === '' || txTo === '0x') || 
                                             (txContractAddress === normalizedAddress) ||
                                             (txTo === normalizedAddress && txFrom !== normalizedAddress);
@@ -216,7 +278,6 @@ async function getContractDeployer(contractAddress) {
                     }
                     
                     // Fallback: Use first transaction's 'from' address
-                    // This handles factory contracts where creation tx might not be obvious
                     const firstTx = txResponse.data.result[0];
                     if (firstTx.from) {
                         const deployer = firstTx.from.toLowerCase();
@@ -234,44 +295,8 @@ async function getContractDeployer(contractAddress) {
             }
         }
 
-        // Method 2: Try Basescan getcontractcreation API
-        if (BASESCAN_API_KEY) {
-            try {
-                console.log('🔍 Method 2: Trying getcontractcreation API...');
-                const response = await axios.get('https://api.basescan.org/api', {
-                    params: {
-                        module: 'contract',
-                        action: 'getcontractcreation',
-                        contractaddresses: normalizedAddress,
-                        apikey: BASESCAN_API_KEY
-                    },
-                    timeout: 10000
-                });
-
-                console.log('📡 getcontractcreation API response:', {
-                    status: response.data.status,
-                    result: response.data.result,
-                    message: response.data.message
-                });
-
-                if (response.data.status === '1' && response.data.result?.length > 0) {
-                    const result = Array.isArray(response.data.result) ? response.data.result[0] : response.data.result;
-                    const deployer = (result.contractCreator || result.creator || result.from)?.toLowerCase();
-                    if (deployer) {
-                        console.log(`✅ Contract deployer (getcontractcreation API): ${deployer}`);
-                        return deployer;
-                    }
-                }
-            } catch (apiError) {
-                console.log('⚠️  getcontractcreation API failed:', apiError.message);
-                if (apiError.response) {
-                    console.log('Response:', JSON.stringify(apiError.response.data, null, 2));
-                }
-            }
-        }
-
         // Method 3: Verify contract exists on blockchain
-        console.log('🔍 Method 3: Verifying contract exists...');
+        console.log('🔍 Method 3: Verifying contract exists on blockchain...');
         const provider = new ethers.providers.JsonRpcProvider(BASE_RPC_URL);
         
         try {
@@ -281,11 +306,15 @@ async function getContractDeployer(contractAddress) {
                 return null;
             }
             
-            console.log('✅ Contract exists on blockchain');
+            console.log('✅ Contract exists on blockchain (code length:', code.length, ')');
             console.log('⚠️  Could not determine deployer - all API methods failed');
-            console.log('💡 Please check Basescan API key and ensure it has proper permissions');
+            console.log('💡 This may be due to:');
+            console.log('   1. Basescan API key missing or invalid');
+            console.log('   2. API rate limiting');
+            console.log('   3. Contract deployed via factory (deployer not directly visible)');
+            console.log('   → Submission will be allowed for manual review');
             
-            return null;
+            return null; // Return null to allow manual review
             
         } catch (blockchainError) {
             console.error('❌ Blockchain query error:', blockchainError.message);
@@ -429,22 +458,24 @@ app.post('/api/register', checkDatabase, async (req, res) => {
             
             if (!walletMatches) {
                 // Wallet doesn't match deployer - REJECT immediately
-                // User must use the wallet that deployed the contract
+                console.log('❌ Wallet mismatch:', {
+                    deployer: deployer,
+                    submittedWallet: walletAddress.toLowerCase()
+                });
                 return res.status(403).json({
                     success: false,
                     message: `Contract ownership verification failed. Please use the wallet that deployed this contract (${deployer.slice(0, 6)}...${deployer.slice(-4)}). Signatures from other wallets are not accepted.`
                 });
             } else {
-                console.log('✅ Wallet matches contract deployer - no signature needed');
+                console.log('✅ Wallet matches contract deployer - verification passed');
             }
         } else {
-            // Deployer not found - This is a security risk, reject the submission
-            // We cannot verify ownership without knowing the deployer
-            console.log('⚠️  Contract deployer not found - rejecting for security');
-            return res.status(403).json({
-                success: false,
-                message: 'Unable to verify contract ownership. The contract deployer could not be found. Please ensure the contract exists on Base network.'
-            });
+            // Deployer not found - Allow submission for manual review
+            // This handles cases where API fails or contract was deployed via factory
+            console.log('⚠️  Contract deployer not found - allowing submission for manual review');
+            console.log('   Contract:', mainContract);
+            console.log('   Submitting wallet:', walletAddress);
+            console.log('   Note: Admin will manually verify ownership during review');
         }
 
         // Check if wallet already exists
@@ -606,14 +637,15 @@ app.post('/api/verify-contract-owner', async (req, res) => {
         // Get contract deployer
         const deployer = await getContractDeployer(contractAddress);
 
-        // If deployer can't be found, reject - we cannot verify ownership
+        // If deployer can't be found, allow for manual review
         if (!deployer) {
-            console.log('⚠️  Deployer not found - cannot verify ownership');
+            console.log('⚠️  Deployer not found - allowing for manual review');
             return res.json({
-                success: false,
+                success: true,
                 deployerMatches: false,
                 deployerAddress: null,
-                message: 'Unable to verify contract ownership. The contract deployer could not be found. Please ensure the contract exists on Base network.'
+                requiresManualReview: true,
+                message: 'Contract deployer could not be automatically verified. Your submission will be reviewed manually by admin.'
             });
         }
 
@@ -627,6 +659,7 @@ app.post('/api/verify-contract-owner', async (req, res) => {
 
         if (!deployerMatches) {
             // Deployer doesn't match - REJECT
+            console.log('❌ Wallet mismatch - rejecting');
             return res.json({
                 success: false,
                 deployerMatches: false,
@@ -636,6 +669,7 @@ app.post('/api/verify-contract-owner', async (req, res) => {
         }
 
         // Deployer matches - ALLOW
+        console.log('✅ Wallet matches deployer - verification passed');
         res.json({
             success: true,
             deployerMatches: true,
