@@ -467,7 +467,7 @@ app.post('/api/register', checkDatabase, async (req, res) => {
             });
         }
 
-        // Validate contract address
+        // Validate contract address format only (no ownership verification)
         if (!ethers.utils.isAddress(mainContract)) {
             return res.status(400).json({
                 success: false,
@@ -475,11 +475,17 @@ app.post('/api/register', checkDatabase, async (req, res) => {
             });
         }
 
-        // Contract ownership verification removed - all submissions go to manual review
-        console.log('📝 Submission received - will be reviewed manually by admin');
+        // ============================================
+        // NO CONTRACT VERIFICATION - MANUAL REVIEW ONLY
+        // ============================================
+        // All contract ownership verification has been removed.
+        // Submissions are accepted without checking deployer address.
+        // Admin will manually verify contract ownership during review.
+        // ============================================
+        console.log('📝 Submission received - NO automatic verification');
         console.log('   Contract:', mainContract);
         console.log('   Submitting wallet:', walletAddress);
-        console.log('   Note: Admin will manually verify contract ownership during review');
+        console.log('   Status: Accepted for manual admin review');
 
         // Check if wallet already exists
         const existing = await pool.query(

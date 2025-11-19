@@ -69,19 +69,16 @@ function updateWalletUI() {
         if (connectBtn) connectBtn.style.display = 'none';
         if (connectHeroBtn) connectHeroBtn.style.display = 'none';
         if (connectCtaBtn) connectCtaBtn.style.display = 'none';
+        // Resubmit button is now inside walletInfo, so it will show automatically
         if (resubmitFormBtn) {
             resubmitFormBtn.style.display = 'inline-block';
-            console.log('✅ Resubmit button shown');
         }
     } else {
         if (walletInfo) walletInfo.style.display = 'none';
         if (connectBtn) connectBtn.style.display = 'block';
         if (connectHeroBtn) connectHeroBtn.style.display = 'block';
         if (connectCtaBtn) connectCtaBtn.style.display = 'block';
-        if (resubmitFormBtn) {
-            resubmitFormBtn.style.display = 'none';
-            console.log('❌ Resubmit button hidden');
-        }
+        // Resubmit button is hidden when walletInfo is hidden
     }
 }
 
@@ -90,13 +87,12 @@ function hideWalletInfo() {
     const connectBtn = document.getElementById('connectWalletBtn');
     const connectHeroBtn = document.getElementById('connectWalletHeroBtn');
     const connectCtaBtn = document.getElementById('connectWalletCtaBtn');
-    const resubmitFormBtn = document.getElementById('resubmitFormBtn');
     
     if (walletInfo) walletInfo.style.display = 'none';
     if (connectBtn) connectBtn.style.display = 'block';
     if (connectHeroBtn) connectHeroBtn.style.display = 'block';
     if (connectCtaBtn) connectCtaBtn.style.display = 'block';
-    if (resubmitFormBtn) resubmitFormBtn.style.display = 'none';
+    // Resubmit button is hidden when walletInfo is hidden
 }
 
 // API Base URL

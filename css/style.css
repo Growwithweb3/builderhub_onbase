@@ -66,6 +66,11 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 1rem 20px;
+    gap: 2rem;
+}
+
+.nav-brand {
+    flex-shrink: 0;
 }
 
 .nav-brand h1 {
@@ -73,6 +78,7 @@ body {
     font-size: 1.5rem;
     font-weight: 700;
     letter-spacing: -0.5px;
+    margin: 0;
 }
 
 .nav-brand a {
@@ -84,6 +90,11 @@ body {
     list-style: none;
     gap: 2rem;
     align-items: center;
+    margin: 0;
+    padding: 0;
+    flex: 1;
+    justify-content: flex-start;
+    margin-left: 2rem;
 }
 
 .nav-link {
@@ -103,13 +114,13 @@ body {
     align-items: center;
     gap: 0.75rem;
     position: relative;
-    margin-left: auto;
+    flex-shrink: 0;
 }
 
 #resubmitFormBtn {
-    order: -1; /* Show before connect button */
     text-decoration: none;
     display: inline-block;
+    white-space: nowrap;
 }
 
 #resubmitFormBtn:hover {
