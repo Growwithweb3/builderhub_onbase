@@ -59,6 +59,7 @@ function updateWalletUI() {
     const connectBtn = document.getElementById('connectWalletBtn');
     const connectHeroBtn = document.getElementById('connectWalletHeroBtn');
     const connectCtaBtn = document.getElementById('connectWalletCtaBtn');
+    const resubmitFormBtn = document.getElementById('resubmitFormBtn');
 
     if (userAddress) {
         const shortAddress = `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`;
@@ -68,11 +69,13 @@ function updateWalletUI() {
         if (connectBtn) connectBtn.style.display = 'none';
         if (connectHeroBtn) connectHeroBtn.style.display = 'none';
         if (connectCtaBtn) connectCtaBtn.style.display = 'none';
+        if (resubmitFormBtn) resubmitFormBtn.style.display = 'inline-block';
     } else {
         if (walletInfo) walletInfo.style.display = 'none';
         if (connectBtn) connectBtn.style.display = 'block';
         if (connectHeroBtn) connectHeroBtn.style.display = 'block';
         if (connectCtaBtn) connectCtaBtn.style.display = 'block';
+        if (resubmitFormBtn) resubmitFormBtn.style.display = 'none';
     }
 }
 
@@ -81,11 +84,13 @@ function hideWalletInfo() {
     const connectBtn = document.getElementById('connectWalletBtn');
     const connectHeroBtn = document.getElementById('connectWalletHeroBtn');
     const connectCtaBtn = document.getElementById('connectWalletCtaBtn');
+    const resubmitFormBtn = document.getElementById('resubmitFormBtn');
     
     if (walletInfo) walletInfo.style.display = 'none';
     if (connectBtn) connectBtn.style.display = 'block';
     if (connectHeroBtn) connectHeroBtn.style.display = 'block';
     if (connectCtaBtn) connectCtaBtn.style.display = 'block';
+    if (resubmitFormBtn) resubmitFormBtn.style.display = 'none';
 }
 
 // API Base URL

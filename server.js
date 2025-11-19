@@ -429,22 +429,33 @@ app.post('/api/register', checkDatabase, async (req, res) => {
             walletAddress,
             xUsername,
             mainContract,
-            hasDescription: !!projectDescription
+            hasDescription: !!projectDescription,
+            projectDescription: projectDescription ? `${projectDescription.substring(0, 50)}...` : 'MISSING',
+            allFields: Object.keys(req.body)
         });
 
         // Validation
-        if (!walletAddress || !xUsername || !mainContract || !projectDescription) {
+        if (!walletAddress || !xUsername || !mainContract) {
             return res.status(400).json({
                 success: false,
-                message: 'Missing required fields: walletAddress, xUsername, mainContract, projectDescription'
+                message: 'Missing required fields: walletAddress, xUsername, mainContract'
+            });
+        }
+
+        // Validate project description
+        if (!projectDescription || !projectDescription.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Project description is required. Please provide a brief description of your project.'
             });
         }
 
         // Validate project description length
-        if (projectDescription.trim().length < 50) {
+        const trimmedDescription = projectDescription.trim();
+        if (trimmedDescription.length < 50) {
             return res.status(400).json({
                 success: false,
-                message: 'Project description must be at least 50 characters long'
+                message: 'Project description must be at least 50 characters long. Please provide more details about your project.'
             });
         }
 
@@ -464,34 +475,11 @@ app.post('/api/register', checkDatabase, async (req, res) => {
             });
         }
 
-        // VERIFY CONTRACT OWNERSHIP - CRITICAL SECURITY CHECK
-        const deployer = await getContractDeployer(mainContract);
-        
-        if (deployer) {
-            // Deployer found - STRICT VERIFICATION: Only deployer wallet can submit
-            const walletMatches = deployer.toLowerCase() === walletAddress.toLowerCase();
-            
-            if (!walletMatches) {
-                // Wallet doesn't match deployer - REJECT immediately
-                console.log('❌ Wallet mismatch:', {
-                    deployer: deployer,
-                    submittedWallet: walletAddress.toLowerCase()
-                });
-                return res.status(403).json({
-                    success: false,
-                    message: `Contract ownership verification failed. Please use the wallet that deployed this contract (${deployer.slice(0, 6)}...${deployer.slice(-4)}). Signatures from other wallets are not accepted.`
-                });
-            } else {
-                console.log('✅ Wallet matches contract deployer - verification passed');
-            }
-        } else {
-            // Deployer not found - Allow submission for manual review
-            // This handles cases where API fails or contract was deployed via factory
-            console.log('⚠️  Contract deployer not found - allowing submission for manual review');
-            console.log('   Contract:', mainContract);
-            console.log('   Submitting wallet:', walletAddress);
-            console.log('   Note: Admin will manually verify ownership during review');
-        }
+        // Contract ownership verification removed - all submissions go to manual review
+        console.log('📝 Submission received - will be reviewed manually by admin');
+        console.log('   Contract:', mainContract);
+        console.log('   Submitting wallet:', walletAddress);
+        console.log('   Note: Admin will manually verify contract ownership during review');
 
         // Check if wallet already exists
         const existing = await pool.query(

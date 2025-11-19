@@ -174,7 +174,8 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
         return;
     }
 
-    // No signature needed - only deployer wallet can submit
+    // Get form data
+    const projectDescriptionEl = document.getElementById('projectDescription');
     const formData = {
         walletAddress: userAddress,
         xUsername: document.getElementById('xUsername').value.trim(),
@@ -183,8 +184,16 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
         mainContract: document.getElementById('mainContract').value.trim().toLowerCase(),
         optionalContract1: document.getElementById('optionalContract1').value.trim().toLowerCase() || null,
         optionalContract2: document.getElementById('optionalContract2').value.trim().toLowerCase() || null,
-        projectDescription: document.getElementById('projectDescription').value.trim()
+        projectDescription: projectDescriptionEl ? projectDescriptionEl.value.trim() : ''
     };
+
+    console.log('📝 Form data prepared:', {
+        walletAddress: formData.walletAddress,
+        xUsername: formData.xUsername,
+        mainContract: formData.mainContract,
+        hasDescription: !!formData.projectDescription,
+        descriptionLength: formData.projectDescription ? formData.projectDescription.length : 0
+    });
 
     // Validate required fields
     if (!formData.xUsername || !formData.mainContract || !formData.projectDescription) {
@@ -204,53 +213,8 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
         return;
     }
 
-    // Verify contract ownership before submission
-    const contractAddress = formData.mainContract;
-    
-    try {
-        const verifyResponse = await fetch(`${API_BASE_URL}/verify-contract-owner`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contractAddress: contractAddress,
-                walletAddress: userAddress
-            })
-        });
-
-        if (verifyResponse.ok) {
-            const verifyData = await verifyResponse.json();
-            
-            // Allow if: (success AND deployerMatches) OR (success AND requiresManualReview)
-            if (verifyData.success && (verifyData.deployerMatches || verifyData.requiresManualReview)) {
-                // Verification passed or manual review required - proceed with submission
-                if (verifyData.requiresManualReview) {
-                    console.log('⚠️ Deployer not found - allowing submission for manual review');
-                } else {
-                    console.log('✅ Wallet matches deployer, proceeding with submission');
-                }
-            } else {
-                // Verification failed - reject submission
-                const deployerAddress = verifyData.deployerAddress || 'the deployer wallet';
-                const errorMsg = verifyData.message || `Contract ownership verification failed. Please use the wallet that deployed this contract (${deployerAddress.slice(0, 6)}...${deployerAddress.slice(-4)}).`;
-                alert(errorMsg);
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit Profile';
-                return;
-            }
-        } else {
-            const errorData = await verifyResponse.json().catch(() => ({ message: 'Unknown error' }));
-            alert(errorData.message || 'Error verifying contract ownership. Please try again.');
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Submit Profile';
-            return;
-        }
-    } catch (verifyError) {
-        console.error('Verification check error:', verifyError);
-        alert('Error verifying contract ownership. Please try again.');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit Profile';
-        return;
-    }
+    // Contract verification removed - all submissions go to manual review
+    console.log('📝 Proceeding with submission - will be reviewed manually by admin');
 
     // Validate X username format
     if (!formData.xUsername.startsWith('@')) {
@@ -260,6 +224,15 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
     try {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Submitting...';
+
+        // Log form data before sending
+        console.log('📤 Sending form data to server:', {
+            walletAddress: formData.walletAddress,
+            xUsername: formData.xUsername,
+            mainContract: formData.mainContract,
+            projectDescription: formData.projectDescription ? `${formData.projectDescription.substring(0, 50)}...` : 'MISSING',
+            descriptionLength: formData.projectDescription ? formData.projectDescription.length : 0
+        });
 
         const response = await fetch(`${API_BASE_URL}/register`, {
             method: 'POST',
@@ -300,25 +273,6 @@ document.getElementById('profileForm')?.addEventListener('submit', async (e) => 
     }
 });
 
-// Auto-check contract ownership when contract address is entered
-document.getElementById('mainContract')?.addEventListener('blur', async function() {
-    const contractAddress = this.value.trim();
-    if (!contractAddress || !contractAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
-        return;
-    }
-
-    if (!userAddress) {
-        return;
-    }
-
-    try {
-        // Use the verifyContractOwnership function which has better error handling
-        await verifyContractOwnership(contractAddress);
-    } catch (error) {
-        // Ignore Solana extension errors
-        if (error.message && !error.message.includes('solana')) {
-            console.error('Contract verification error:', error);
-        }
-    }
-});
+// Auto-verification removed - all submissions go to manual review
+// Contract verification is now handled manually by admin during review
 
