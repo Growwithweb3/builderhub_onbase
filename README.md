@@ -1,6 +1,10 @@
+**I had used curosrAI pro to resolve the bug realted to this project: Idea and structue was mine**
+
 # Builder Hub on Base
 
 A decentralized directory for Base developers to register, verify, and rank their projects using real on-chain data.
+
+[ I already shutdown the server and database ofthis project but if you want to expolore this project check the code - for now only frontend part is active https://mini-app-for-farcaster.vercel.app/ ]
 
 ---
 
@@ -187,11 +191,6 @@ Feel free to fork, open issues, or contribute pull requests.
 
 ---
 
-##  License
-
-MIT License — free for all builders.
-
----
 
 ##  Powered by Base
 
